@@ -39,4 +39,20 @@ return [
         ],
         'ssl'            => false,
     ],
+    'slb'                               => [
+        'accessKey'      => '',
+        'accessSecret'   => '',
+        'address'        => 'https://slb.aliyuncs.com',
+        'machines'       => [
+            'machine'   => 'machineId'
+        ],
+        'slbs'           => [
+            [
+                "key" => "slbId",
+                "servers" => [
+                    "machine"
+                ]
+            ],
+        ]
+    ]
 ];

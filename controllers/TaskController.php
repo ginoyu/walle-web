@@ -15,6 +15,15 @@ class TaskController extends Controller
 
     protected $task;
 
+    public function actionChangeFlow() {
+        $machine = $this->getParam('machine');
+        $flow = $this->getParam('flow');
+        if (is_numeric($flow)) $flow = intval($flow);
+        $slbClient = new AliyunSlb();
+        $r = $slbClient->changeSlb($machine, $flow);
+        $this->renderJson([$r], self::SUCCESS);
+    }
+
     /**
      * 我的上线列表
      *
