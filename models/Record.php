@@ -110,4 +110,29 @@ class Record extends \yii\db\ActiveRecord
         ];
         return $record->save();
     }
+
+    /**
+     * 保存记录
+     * @param $status
+     * @param $command
+     * @param $task_id
+     * @param $action
+     * @param $duration
+     * @return mixed
+     */
+    public static function saveRecordCustomCommand($status, $command, $task_id, $action, $duration)
+    {
+        $record = new static();
+        $record->attributes = [
+            'user_id' => \Yii::$app->user->id,
+            'task_id' => $task_id,
+            'status' => $status,
+            'action' => $action,
+            'created_at' => time(),
+            'command' => $command,
+            'memo' => $command,
+            'duration' => $duration,
+        ];
+        return $record->save();
+    }
 }

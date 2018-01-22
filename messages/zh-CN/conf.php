@@ -86,4 +86,16 @@ return [
     'js copy failed' => '复制失败: ',
     'js copy project confirm' => '确定要复制该项目？',
 
+    'enable slb' => "开启slb配置:",
+    'open slb tip' => '开启slb配置，实现上线分流',
+    'access key id' => '阿里云AccesskeyId:',
+    'access key secret' =>'阿里云AccessKeySecret:',
+    'load balance id' => '阿里云LoadBalanceId:',
+    'region' => '阿里云regionId:',
+    'access key id empty tips' => 'AccessKeyId不能为空',
+    'access key secret empty tips' => 'AccessKeySecret不能为空',
+    'region empty tips' => 'regionId不能为空',
+    'load balance id empty tips' => 'LoadBalanceId不能为空',
+    'get ip empty tips' => '获取到的ip数据为空，请检查配置参数是否正确',
+    'test url' => '项目测试地址:'
 ];

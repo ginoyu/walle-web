@@ -50,4 +50,8 @@ return [
     'get commit log failed' => 'get commit log failed：',
     'get tags failed' => 'get tags failed：',
     'unknown scm' => 'unknown scm',
+    "unknown slb type" => "unKnow slb type",
+    'slb switch error' => 'SLB switch error',
+    'slb test error'=>'SLB test error',
+    'redis connect error'=>'redis connect failed'
 ];

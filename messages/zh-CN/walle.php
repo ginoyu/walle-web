@@ -20,6 +20,7 @@ return [
     'process_post-deploy' => 'post-deploy任务',
     'process_rsync' => '同步至服务器',
     'process_update' => '全量更新(pre-release、更新版本、post-release)',
+    'process_test_swich_flow' => 'pre-release、更新版本、post-release、SLB切换流量、自动化测试',
     'deploying' => '部署上线',
 
     'deployment id is empty' => '上线单号不能为空：）',
@@ -59,5 +60,9 @@ return [
     'the login dirver configs parse error' => '{loginType} 配置解析出错',
     'illegal service port' => '非法的 {service} 端口：{port}',
     'account base dn could not defined' => 'Account base DN 未定义',
-    'account pattern could not defined' => '用户搜索模式未定义'
+    'account pattern could not defined' => '用户搜索模式未定义',
+    "unknown slb type" => "未知的slb的类型",
+    'slb switch error' => 'SLB流量切换出错',
+    'slb test error'=>'SLB服务测试出错',
+    'redis connect error'=>'redis连接失败'
 ];

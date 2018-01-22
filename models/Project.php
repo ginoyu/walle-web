@@ -38,6 +38,10 @@ use yii\db\Expression;
  * @property integer $keep_version_num
  * @property \DateTime $created_at
  * @property \DateTime $updated_at
+ * @property integer $slb_status
+ * @property string $slb_type
+ * @property string $slb_config
+ * @property string $test_url
  */
 class Project extends \yii\db\ActiveRecord
 {
@@ -105,9 +109,9 @@ class Project extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['user_id', 'repo_url', 'name', 'level', 'deploy_from', 'release_user', 'release_to', 'release_library', 'hosts', 'keep_version_num'], 'required'],
-            [['user_id', 'level', 'status', 'post_release_delay', 'audit', 'ansible', 'keep_version_num'], 'integer'],
-            [['excludes', 'hosts', 'pre_deploy', 'post_deploy', 'pre_release', 'post_release'], 'string'],
+            [['user_id', 'repo_url', 'name', 'level', 'deploy_from', 'release_user', 'release_to', 'release_library', 'hosts', 'keep_version_num','slb_type'], 'required'],
+            [['user_id', 'level', 'status', 'post_release_delay', 'audit', 'ansible', 'keep_version_num','slb_status'], 'integer'],
+            [['excludes', 'hosts', 'pre_deploy', 'post_deploy', 'pre_release', 'post_release','test_url'], 'string'],
             [['created_at', 'updated_at'], 'safe'],
             [['name', 'repo_password'], 'string', 'max' => 100],
             [['version'], 'string', 'max' => 20],

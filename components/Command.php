@@ -127,6 +127,42 @@ class Command
     }
 
     /**
+     * 执行远程目标机器命令
+     *
+     * @param string  $command
+     * @param integer $delay 每台机器延迟执行post_release任务间隔, 不推荐使用, 仅当业务无法平滑重启时使用
+     * @param host
+     * @return bool
+     */
+    final public function runRemoteCommandByHost($command, $delay = 0, $remoteHost)
+    {
+        $this->log = '';
+        $needTTY = '-T';
+
+        $localCommand = sprintf('ssh %s -p %d -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o CheckHostIP=false %s@%s %s',
+            $needTTY, $this->getHostPort($remoteHost), escapeshellarg($this->getConfig()->release_user),
+            escapeshellarg($this->getHostName($remoteHost)), escapeshellarg($command));
+
+        if ($delay > 0) {
+            // 每台机器延迟执行post_release任务间隔, 不推荐使用, 仅当业务无法平滑重启时使用
+            static::log(sprintf('Sleep: %d s', $delay));
+            sleep($delay);
+        }
+
+        static::log('runRemoteCommandByHost ' . $command);
+
+        $log = $this->log;
+        $this->status = $this->runLocalCommand($localCommand);
+
+        $this->log = $log . (($log ? PHP_EOL : '') . $remoteHost . ' : ' . $this->log);
+        if (!$this->status) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * 加载配置
      *
      * @param $config

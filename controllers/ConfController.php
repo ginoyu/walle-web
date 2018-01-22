@@ -2,6 +2,11 @@
 
 namespace app\controllers;
 
+use app\components\AliyunSlb;
+use app\components\Command;
+use app\components\ISlb;
+use app\components\SlbFactory;
+use app\models\slb\SlbConfig;
 use yii;
 use yii\web\NotFoundHttpException;
 use yii\data\Pagination;
@@ -131,8 +136,14 @@ class ConfController extends Controller
         }
 
         if (\Yii::$app->request->getIsPost() && $project->load(Yii::$app->request->post())) {
+
             $project->user_id = $this->uid;
 
+            $config = SlbFactory::composeSlbConfig($project->slb_type,Yii::$app->request->post());
+            // save config with json format
+            $project->slb_config = json_encode($config);
+//            $project->slb_status = Yii::$app->request->post("Project[slb_status]");
+//            echo 'post:'.json_encode(Yii::$app->request->post()).'config:'.json_encode($config).' slb_status:'.Yii::$app->request->post("Project")["slb_status"];
             if ($project->save()) {
                 // 保存ansible需要的hosts文件
                 $this->_saveAnsibleHosts($project);
@@ -224,6 +235,25 @@ class ConfController extends Controller
         $this->renderJson([]);
     }
 
+    public function actionGetSlbMachine()
+    {
+        $conf = [
+            AliyunSlb::KEY_REGION_ID => $_GET[AliyunSlb::KEY_REGION_ID],
+            AliyunSlb::KEY_LOAD_BALANCE_ID => $_GET[AliyunSlb::KEY_LOAD_BALANCE_ID]
+        ];
+//        Command::log("actionGetSlbMachine params");
+
+        $conf = array_merge($conf, SlbFactory::getPrivateSlbConfigArray($_GET[ISlb::SLB_TYPE]));
+//        Command::log("actionGetSlbMachine params:".json_encode($conf));
+
+        $slb = SlbFactory::getSlb($_GET[ISlb::SLB_TYPE]);
+        $data = $slb->getEcsIpList($conf);
+
+//        Command::log("getEcsIpList result:".json_encode($data));
+
+        return self::renderJson($data);
+    }
+
     /**
      * 简化
      *
@@ -263,5 +293,6 @@ class ConfController extends Controller
 
         return true;
     }
+
 
 }

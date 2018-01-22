@@ -84,4 +84,16 @@ return [
     'js copy failed' => 'copy failed: ',
     'js copy project confirm' => 'Sure to copy this Project？',
 
+    'enable slb' => 'enable slb:',
+    'open slb tip' => 'open the config of slb:',
+    'access key id' => 'aliyun access key id:',
+    'access key secret' =>'aliyun AccessKeySecret:',
+    'load balance id' => 'aliyun LoadBalanceId:',
+    'region' => 'aliyun regionId:',
+    'access key id empty tips' => 'AccessKeyId is empty',
+    'access key secret empty tips' => 'AccessKeySecret is empty',
+    'region empty tips' => 'regionId is empty',
+    'load balance id empty tips' => 'LoadBalanceId is empty',
+    'get ip empty tips' => 'get ip data is empty! please check config',
+    'test url' => 'project test url:'
 ];

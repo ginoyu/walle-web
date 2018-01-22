@@ -40,7 +40,12 @@ use yii\helpers\Url;
         <span><i class="fa fa-circle-o text-yellow step-3"></i><?= yii::t('walle', 'process_checkout') ?></span>
         <span><i class="fa fa-circle-o text-yellow step-4"></i><?= yii::t('walle', 'process_post-deploy') ?></span>
         <span><i class="fa fa-circle-o text-yellow step-5"></i><?= yii::t('walle', 'process_rsync') ?></span>
-        <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-6"></i><?= yii::t('walle', 'process_update') ?></span>
+
+        <?php if ($task->project->slb_status) { ?>
+            <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-6"></i><?= yii::t('walle', 'process_test_swich_flow') ?></span>
+        <?php } else { ?>
+            <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-7"></i><?= yii::t('walle', 'process_update') ?></span>
+        <?php } ?>
     </div>
     <div style="clear:both"></div>
     <div class="progress progress-small progress-striped active">

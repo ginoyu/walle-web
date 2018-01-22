@@ -1,156 +1,307 @@
 <?php
-/* *****************************************************************
- * @Author: libing
- * @Created Time : 日  12/2 14:20:00 2017
- *
- * @File Name: command/Svn.php
- * @Description:
- * *****************************************************************/
+/**
+ * Created by PhpStorm.
+ * User: root
+ * Date: 1/11/18
+ * Time: 8:43 PM
+ */
 
 namespace app\components;
 
-use Yii;
-use yii\httpclient\Client;
 
-class AliyunSlb
+class AliyunSlb implements ISlb
 {
-    private $machines = [];
-    private $slbs = [];
-    private $accessKey = '';
-    private $accessSecret = '';
-    private $address = '';
+    const CURL_SLB_URL = "http://slb.aliyuncs.com";
+    const CURL_ECS_URL = "http://ecs.aliyuncs.com";
+    const CURL_FORMATE = "JSON";
+    const CURL_SLB_VERSION = "2014-05-15";
+    const CURL_ECS_VERSION = "2014-05-26";
+    const CURL_SIGNATURE_METHOD = "HMAC-SHA1";
+    const CURL_SIGNATURE_VERSION = "1.0";
 
-    private $curl_format = 'JSON';
-    private $curl_version = '2014-05-15';
-    private $curl_signature_version = '1.0';
-    private $curl_signature_method = 'HMAC-SHA1';
-    private $curl_action = 'SetBackendServers';
+    // public params
+    const KEY_FORMATE = "Format";
+    const KEY_VERSION = "Version";
+    const KEY_ACCESSKEYID = "AccessKeyId";
+    const KEY_ACCESSKEY_SECRECT = "AccessKeySecret";
+    const KEY_SIGNATURE = "Signature";
+    const KEY_SIGNATURE_METHOD = "SignatureMethod";
+    const KEY_TIMESTAMP = "Timestamp";
+    const KEY_SIGNATURE_VERSION = "SignatureVersion";
+    const KEY_SIGNATURE_NONCE = "SignatureNonce";
+
+    // private params
+    const KEY_ACTION = "Action";
+    const KEY_REGION_ID = "RegionId";
+    const KEY_LISTENER_PORT = '80';
+    const KEY_LOAD_BALANCE_ID = "LoadBalancerId";
+    const KEY_BACKEND_SERVERS = "BackendServers";
+    const KEY_SERVERID = "ServerId";
+    const KEY_WEIGHT = "Weight";
+
+    // private action
+    const ACTION_DESCRIBE_REGIONS = "DescribeRegions";
+    const ACTION_DESCRIBE_LOAD_BALANCERS = "DescribeLoadBalancers";
+    const ACTION_DESCRIBE_HEALTH_STATUS = "DescribeHealthStatus";
+    const ACTION_DESCRIBE_LOAD_BALANCER_ATTRIBUTE = "DescribeLoadBalancerAttribute";
+    const ACTION_SET_BACKEND_SERVERS = "SetBackendServers";
+    const ACTION_DESCRIBE_INSTANCES = "DescribeInstances";
 
 
-    public function __Construct() {
-        $slbConfig = \Yii::$app->params['slb'];
-        $this->machines = $slbConfig['machines'];
-        $this->slbs = $slbConfig['slbs'];
-        $this->accessKey = $slbConfig['accessKey'];
-        $this->accessSecret = $slbConfig['accessSecret']; 
-        $this->address = $slbConfig['address'];
+    // param key
+    const PARAM_KEY_SERVER_ID = "serverId";
+    const PARAM_KEY_SERVER_IP = "ip";
+
+    private $mAccessKeyId = "";
+    private $mAccessKeySecret = "";
+    private $mRegionId = "cn-beijing";
+    private $mLoadBanceId = "lb-2ze7bcize8zopo9mcyuwn";
+
+    private function loadConfig($config)
+    {
+        $this->mAccessKeyId = $config[self::KEY_ACCESSKEYID];
+        $this->mAccessKeySecret = $config[self::KEY_ACCESSKEY_SECRECT];
+        $this->mRegionId = $config[self::KEY_REGION_ID];
+        $this->mLoadBanceId = $config[self::KEY_LOAD_BALANCE_ID];
     }
 
     /**
-     * change the rate of flow for point machines
-     * @param  string  $machine the machine to change flow
-     * @param  integer $flow    the flow to change
-     */
-    public function changeSlb($machine, $flow) {
-        if (!($serverId = $this->getServerId($machine))) throw new \Exception(\Yii::t('slb', 'not found machine', ['machine' => $machine])); 
-        $slbId = $this->getSlbId($machine);
-        if ($slbId === null) throw new \Exception(\Yii::t('slb', 'not found slb', ['machine' => $machine]));
-        if ($slbId === []) throw new \Exception(\Yii::t('slb', 'too many slb', ['machine' => $machine]));
-        if (!$this->checkFlow($flow)) throw new \Exception(\Yii::t('slb', 'iwrong flow', ['machine' => $machine]));
-        $url = $this->getUrl($serverId, $slbId, $flow);
-        $r = $this->execSlbCmd($url);
-        if ($r->isOk) return $this->parseResult($r->data); 
-        else throw new \Exception(\Yii::t('slb', 'query aliyun error', ['result' => json_encode($r->data)]));
-    }
-
-    private function getServerId($machine) {
-        if (!isset($this->machines[$machine])) return false;
-        return $this->machines[$machine];
-    }
-
-    private function getSlbId($machine) {
-        $slbId = null;
-        foreach($this->slbs as $slb) {
-            if (in_array($machine, $slb['servers'])) {
-                if ($slbId === null) $slbId = $slb['key'];
-                else $slbId = [];
+     * get ecs ip list by slb config
+     **/
+    public function getEcsIpList($config = [])
+    {
+        $data = $this->describeLoadBalancerAttribute($config);
+        $balanceInfo = json_decode($data);
+        $serverIds = [];
+        if (isset($balanceInfo) && isset($balanceInfo->BackendServers) && isset($balanceInfo->BackendServers->BackendServer)) {
+            $backendServer = $balanceInfo->BackendServers->BackendServer;
+            foreach ($backendServer as $server) {
+                $serverIds[] = $server->ServerId;
             }
         }
-        return $slbId;
+
+
+        $data = $this->getInstances($config);
+        $ecsInstance = json_decode($data);
+
+        $results = [];
+        if (isset($ecsInstance) && isset($ecsInstance->Instances) && isset($ecsInstance->Instances->Instance)) {
+            $ecsInstances = $ecsInstance->Instances->Instance;
+            foreach ($ecsInstances as $instance) {
+                if (in_array($instance->InstanceId, $serverIds)) {
+                    $ip = "";
+                    if (isset($instance->PublicIpAddress) && isset($instance->PublicIpAddress->IpAddress)) {
+                        $ip = $instance->PublicIpAddress->IpAddress[0];
+                    } else {
+                        echo $instance->InstanceId . " has not ip params!";
+                    }
+                    array_push($results, [self::PARAM_KEY_SERVER_ID => $instance->InstanceId, self::PARAM_KEY_SERVER_IP => $ip]);
+                }
+            }
+        }
+
+        return $results;
+
     }
 
-    private function checkFlow($flow) {
-        if (is_int($flow) && $flow >= 0 && $flow <= 100) return true;
-        return false;
+    public function getInstances($config)
+    {
+        $this->loadConfig($config);
+        $params = [
+            self::KEY_ACTION => self::ACTION_DESCRIBE_INSTANCES,
+            self::KEY_VERSION => self::CURL_ECS_VERSION,
+            self::KEY_REGION_ID => $this->mRegionId
+        ];
+        $data = $this->requestAliSlbService(self::CURL_ECS_URL, $params);
+        return $data;
     }
 
-    private function getUuid() {
-        mt_srand((double)microtime()*10000);
+    /**
+     * set backend server weight
+     **/
+    public function setBackendServerWeight($config = [], $ip, $weight)
+    {
+        Command::log('setBackendServerWeight ip:' . $ip . ' weight:' . $weight);
+        /*$this->loadConfig($config);
+        $params = [
+            self::KEY_ACTION => self::ACTION_SET_BACKEND_SERVERS,
+            self::KEY_VERSION => self::CURL_SLB_VERSION,
+            self::KEY_LOAD_BALANCE_ID => $this->mLoadBanceId,
+            self::KEY_BACKEND_SERVERS => json_encode($ecs)
+        ];
+        $data = $this->requestAliSlbService(self::CURL_SLB_URL, $params);
+        return $data;*/
+        return $this->setBackendServerWeightWithIp($config, $ip, $weight);
+    }
+
+    /**
+     * set backend server weight
+     **/
+    private function setBackendServerWeightWithIp($config = [], $ip, $weight)
+    {
+        Command::log('setBackendServerWeightWithIp ip:' . $ip . ' weight:' . $weight);
+        $this->loadConfig($config);
+        $serverInfos = $this->getEcsIpList($config);
+        $serverId = "";
+        foreach ($serverInfos as $serverInfo) {
+            if (strcmp($serverInfo[self::PARAM_KEY_SERVER_IP], $ip) == 0) {
+                $serverId = $serverInfo[self::PARAM_KEY_SERVER_ID];
+                break;
+            }
+        }
+
+        if (!$serverId) {
+            Command::log('setBackendServerWeightWithIp ip:' . $ip . ' serverId not exist');
+            return false;
+        }
+
+        Command::log('changed serverId:' . $serverId);
+
+        // get origin weight
+        $loadBancerResult = $this->describeLoadBalancerAttribute($config);
+        $loadBancerInfo = json_decode($loadBancerResult);
+
+        $originWeight = -1;
+        if (isset($loadBancerInfo) && isset($loadBancerInfo->BackendServers) && isset($loadBancerInfo->BackendServers->BackendServer)) {
+            foreach ($loadBancerInfo->BackendServers->BackendServer as $result) {
+                if (strcmp($result->ServerId, $serverId) == 0) {
+                    $originWeight = $result->Weight;
+                    break;
+                }
+            }
+        }
+
+        $ecs = [[self::KEY_SERVERID => $serverId, self::KEY_WEIGHT => $weight]];
+        $params = [
+            self::KEY_ACTION => self::ACTION_SET_BACKEND_SERVERS,
+            self::KEY_VERSION => self::CURL_SLB_VERSION,
+            self::KEY_LOAD_BALANCE_ID => $this->mLoadBanceId,
+            self::KEY_BACKEND_SERVERS => json_encode($ecs)
+        ];
+        $data = $this->requestAliSlbService(self::CURL_SLB_URL, $params);
+
+
+        $resultObj = json_decode($data);
+
+        $success = false;
+        // get result
+        if (isset($resultObj) && isset($resultObj->BackendServers) && isset($resultObj->BackendServers->BackendServer)) {
+            foreach ($resultObj->BackendServers->BackendServer as $result) {
+                if (strcmp($result->ServerId, $serverId) == 0) {
+                    if ($result->Weight == $weight) {
+                        $success = true;
+                        break;
+                    }
+                }
+            }
+        }
+        Command::log('setBackendServerWeightWithIp ip:' . $ip . ' result:' . $data . ' success:' . ($success ? 'true' : 'false') . ' originWeight:' . $originWeight);
+
+        return ['success' => $success, 'originWeight' => $originWeight];
+    }
+
+    public function describeRegions($config = [])
+    {
+        $this->loadConfig($config);
+        $params = [
+            self::KEY_ACTION => self::ACTION_DESCRIBE_REGIONS,
+            self::KEY_VERSION => self::CURL_SLB_VERSION
+        ];
+        $data = $this->requestAliSlbService(self::CURL_SLB_URL, $params);
+        return $data;
+    }
+
+    public function describeLoadBalancerAttribute($config = [])
+    {
+        $this->loadConfig($config);
+        $params = [
+            self::KEY_ACTION => self::ACTION_DESCRIBE_LOAD_BALANCER_ATTRIBUTE,
+            self::KEY_REGION_ID => $this->mRegionId,
+            self::KEY_LOAD_BALANCE_ID => $this->mLoadBanceId,
+            self::KEY_VERSION => self::CURL_SLB_VERSION
+        ];
+        $data = $this->requestAliSlbService(self::CURL_SLB_URL, $params);
+        return $data;
+    }
+
+    private function requestAliSlbService($host, $params)
+    {
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($curl, CURLOPT_URL, $this->getUrl($host, $params));
+
+        $data = curl_exec($curl);
+
+        curl_close($curl);
+        return $data;
+    }
+
+    private function getUrl($host, $params, $method = 'GET')
+    {
+        $publicParams = [
+            self::KEY_FORMATE => self::CURL_FORMATE,
+//            self::KEY_VERSION => self::CURL_ECS_VERSION,
+            self::KEY_ACCESSKEYID => $this->mAccessKeyId,
+            self::KEY_SIGNATURE_METHOD => self::CURL_SIGNATURE_METHOD,
+            self::KEY_TIMESTAMP => $this->getTimeStamp(),
+            self::KEY_SIGNATURE_VERSION => self::CURL_SIGNATURE_VERSION,
+            self::KEY_SIGNATURE_NONCE => $this->getUuid()
+
+        ];
+        $params = array_merge($params, $publicParams);
+
+        $params[self::KEY_SIGNATURE] = $this->compute_signature($params, $method);
+
+        $url = $host . "/?" . http_build_query($params);
+        return $url;
+
+    }
+
+    private function compute_signature($params, $method = 'GET')
+    {
+        ksort($params);
+        $stringToSign = strtoupper($method) . "&" . $this->percentEncode("/") . "&";
+        $keyString = "";
+        foreach ($params as $key => $value) {
+            $keyString .= '&' . $this->percentEncode($key) . '=' . $this->percentEncode($value);
+        }
+        $keyString = trim($keyString, '&');
+        $stringToSign .= $this->percentEncode($keyString);
+
+        $key = $this->mAccessKeySecret . '&';
+
+        $result = hash_hmac("sha1", $stringToSign, $key, true);
+
+        return base64_encode($result);
+    }
+
+    private function getTimeStamp()
+    {
+        date_default_timezone_set("UTC");
+        $timestamp = date('Y-m-d\TH:i:s\Z', time());
+        date_default_timezone_set("Asia/Shanghai");
+        return $timestamp;
+    }
+
+    private function getUuid()
+    {
+        mt_srand((double)microtime() * 10000);
         $charid = strtoupper(md5(uniqid(rand(), true)));
         $hyphen = chr(45);// "-"
-        $uuid = substr($charid, 0, 8).$hyphen
-                .substr($charid, 8, 4).$hyphen
-                .substr($charid,12, 4).$hyphen
-                .substr($charid,16, 4).$hyphen
-                .substr($charid,20,12);
+        $uuid = substr($charid, 0, 8) . $hyphen
+            . substr($charid, 8, 4) . $hyphen
+            . substr($charid, 12, 4) . $hyphen
+            . substr($charid, 16, 4) . $hyphen
+            . substr($charid, 20, 12);
         return $uuid;
     }
 
-    private function percentEncode($str) {
+    private function percentEncode($str)
+    {
         $str = urlencode($str);
         $str = str_replace('+', '%20', $str);
         $str = str_replace('*', '%2A', $str);
         $str = str_replace('%7E', '~', $str);
         return $str;
-    }
-
-    private function compute_signature($params, $method = 'GET') {
-        ksort($params);
-        $stringToSign = strtoupper($method).'&'.$this->percentEncode('/').'&';
-
-        $tmp = "";
-        foreach($params as $key => $val){
-            $tmp .= '&'.$this->percentEncode($key).'='.$this->percentEncode($val);
-        }
-        $tmp = trim($tmp, '&');
-        $stringToSign = $stringToSign.$this->percentEncode($tmp);
-
-        $key  = $this->accessSecret.'&';
-        $hmac = hash_hmac("sha1", $stringToSign, $key, true);
-
-        return base64_encode($hmac);
-    }
-
-    private function getUrl($serverId, $slbId, $flow) {
-        date_default_timezone_set("UTC");
-        $timestamp = date('Y-m-d\TH:i:s\Z', time());
-        date_default_timezone_set("Asia/Shanghai");
-        $backendServers = json_encode([[
-            'ServerId' => $serverId,
-            'Weight' => $flow
-        ]]);
-        $params = [
-            'Format' => $this->curl_format,
-            'Version' => $this->curl_version,
-            'AccessKeyId' => $this->accessKey,
-            'SignatureVersion' => $this->curl_signature_version,
-            'SignatureMethod' => $this->curl_signature_method,
-            'Action' => $this->curl_action,
-            'BackendServers' => $backendServers,
-            'LoadBalancerId' => $slbId,
-            'SignatureNonce' => $this->getUuid(),
-            'TimeStamp' => $timestamp
-        ];
-        $signature = $this->compute_signature($params);
-        $params['Signature'] = $signature;
-        $url = $this->address . '/?' . http_build_query($params);
-        return $url;
-    }
-
-    private function execSlbCmd($url) {
-        $client  =  new Client();
-        $response = $client->createRequest()
-            ->setMethod('get')
-            ->setUrl($url)
-            ->send();
-        return $response;
-    }
-
-    private function parseResult($data) {
-        $data = json_decode($data, true);
-        if (isset($data['BackendServers']) && isset($data['BackendServers']['BackendServer'])) {
-            return ''; 
-        }
-        return '';
     }
 }

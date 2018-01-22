@@ -13,13 +13,17 @@ use app\components\Ansible;
 use app\components\Command;
 use app\components\Controller;
 use app\components\Folder;
+use app\components\GlobalHelper;
+use app\components\ISlb;
 use app\components\Repo;
+use app\components\SlbFactory;
 use app\components\Task as WalleTask;
 use app\models\Project;
 use app\models\Group;
 use app\models\Record;
 use app\models\Task as TaskModel;
 use yii;
+
 class WalleController extends Controller
 {
 
@@ -115,6 +119,7 @@ class WalleController extends Controller
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
         } catch (\Exception $e) {
+            Command::log('exception happend!' . $e->getTraceAsString());
             $this->task->status = TaskModel::STATUS_FAILED;
             $this->task->save();
             // 清理本地部署空间
@@ -135,13 +140,13 @@ class WalleController extends Controller
         $projectTable = Project::tableName();
         $groupTable = Group::tableName();
         $projects = Project::find()
-                           ->leftJoin(Group::tableName(), "`$groupTable`.`project_id` = `$projectTable`.`id`")
-                           ->where([
-                               "`$projectTable`.status" => Project::STATUS_VALID,
-                               "`$groupTable`.`user_id`" => $this->uid
-                           ])
-                           ->asArray()
-                           ->all();
+            ->leftJoin(Group::tableName(), "`$groupTable`.`project_id` = `$projectTable`.`id`")
+            ->where([
+                "`$projectTable`.status" => Project::STATUS_VALID,
+                "`$groupTable`.`user_id`" => $this->uid
+            ])
+            ->asArray()
+            ->all();
 
         return $this->render('check', [
             'projects' => $projects,
@@ -347,9 +352,9 @@ class WalleController extends Controller
     public function actionDeploy($taskId)
     {
         $this->task = TaskModel::find()
-                               ->where(['id' => $taskId])
-                               ->with(['project'])
-                               ->one();
+            ->where(['id' => $taskId])
+            ->with(['project'])
+            ->one();
         if (!$this->task) {
             throw new \Exception(yii::t('walle', 'deployment id not exists'));
         }
@@ -370,15 +375,37 @@ class WalleController extends Controller
     public function actionGetProcess($taskId)
     {
         $record = Record::find()
-                        ->select(['percent' => 'action', 'status', 'memo', 'command'])
-                        ->where(['task_id' => $taskId,])
-                        ->orderBy('id desc')
-                        ->asArray()
-                        ->one();
+            ->select(['percent' => 'action', 'status', 'memo', 'command'])
+            ->where(['task_id' => $taskId,])
+            ->orderBy('id desc')
+            ->asArray()
+            ->one();
         $record['memo'] = stripslashes($record['memo']);
         $record['command'] = stripslashes($record['command']);
 
         $this->renderJson($record);
+    }
+
+    public function actionNotifyTestResult()
+    {
+        $params = \Yii::$app->request->get();
+        $redis = new \Redis();
+        $conResult = $redis->connect('127.0.0.1', 6379);
+        $code = 0;
+        $msg = 'success';
+        if (!$conResult) {
+            $code = -110;// redis connect failed
+            $msg = 'redis connect failed';
+        } else {
+            if (!isset($params['randomKey'])) {
+                $code = -111;// params randomKey
+                $msg = 'please provide randomKey param';
+            } else {
+                $redis->set($params['randomKey'], json_encode($params), 60);
+                Command::log('redis value set success:' . $redis->get($params['randomKey']));
+            }
+        }
+        $this->renderJson($params, $code, $msg);
     }
 
     /**
@@ -517,11 +544,11 @@ class WalleController extends Controller
      * 执行远程服务器任务集合
      * 对于目标机器更多的时候是一台机器完成一组命令，而不是每条命令逐台机器执行
      *
-     * @param string  $version
+     * @param string $version
      * @param integer $delay 每台机器延迟执行post_release任务间隔, 不推荐使用, 仅当业务无法平滑重启时使用
      * @throws \Exception
      */
-    private function _updateRemoteServers($version, $delay = 0)
+    private function _updateRemoteServers($version, $delay = 0, $rollback = false)
     {
         $cmd = [];
         // pre-release task
@@ -538,16 +565,174 @@ class WalleController extends Controller
         }
 
         $sTime = Command::getMs();
-        // run the task package
-        $ret = $this->walleTask->runRemoteTaskCommandPackage($cmd, $delay);
-        // 记录执行时间
-        $duration = Command::getMs() - $sTime;
-        Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
-        if (!$ret) {
-            throw new \Exception(yii::t('walle', 'update servers error'));
+
+        if ($rollback || !$this->conf->slb_status) {
+            Command::log('====start normal logic:' . $rollback . ' status:' . $this->conf->slb_status);
+            // run the task package
+            $ret = $this->walleTask->runRemoteTaskCommandPackage($cmd, $delay);
+            // 记录执行时间
+            $duration = Command::getMs() - $sTime;
+            Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
+            if (!$ret) {
+                throw new \Exception(yii::t('walle', 'update servers error'));
+            }
+        } else {
+
+            Command::log('====start slb logic');
+
+            // deal slb logic
+            $hosts = GlobalHelper::str2arr($this->conf->hosts);
+            $slb = SlbFactory::getSlb($this->conf->slb_type);
+
+            $executeResult = true;
+            $errMsg = '';
+            $errorCommand = '';
+            foreach ($hosts as $host) {
+                $ret = $this->walleTask->runRemoteTaskCommandByHost($cmd, $delay, $host);
+                if (!$ret) {
+                    $errorCommand = var_export($this->walleTask->getExeCommand());
+                    $errMsg = yii::t('walle', 'update servers error');
+                    $executeResult = false;
+                    break;
+                }
+
+                Command::log('step1 remote server:'.$host.' update files success');
+
+                // slb switch
+                $switchRet = $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, 0);
+
+                if (!$switchRet) {
+                    $errorCommand = 'switch slb host:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'slb switch error');
+                    $executeResult = false;
+                    break;
+                }
+
+                Command::log('step2 remote server:'.$host.' switch slb 0 success!');
+                // call test url
+                $testRet = $this->requestTestService($host);
+                if (!$testRet) {
+                    $errorCommand = 'execute test host:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'slb test error');
+                    $executeResult = false;
+                    $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, $switchRet['originWeight']);
+                    break;
+                }
+
+                Command::log('step3 remote server:'.$host.' test success');
+                //slb switch
+                $switchRet = $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, $switchRet['originWeight']);
+                if (!$switchRet) {
+                    $errorCommand = 'final switch slb host:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'slb switch error');
+                    $executeResult = false;
+                    break;
+                }
+                Command::log('step4 remote server:'.$host.' switch slb 100 success');
+
+            }
+
+            if (!$executeResult) {
+                $duration = Command::getMs() - $sTime;
+                $this->dealSlbError($errorCommand, $duration);
+                throw new \Exception($errMsg);
+            }
+
+            $duration = Command::getMs() - $sTime;
+            Record::saveRecordCustomCommand(1, 'run slb test success', $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
+
+            Command::log('update server success!');
         }
 
         return true;
+    }
+
+    private function dealSlbError($command, $duration)
+    {
+        // rollback version
+        $version = $this->conf->version;
+        // rollback begin
+        $cmd = [];
+        // pre-release task
+        if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version))) {
+            $cmd[] = $preRelease;
+        }
+        // link
+        if (($linkCmd = $this->walleFolder->getLinkCommand($version))) {
+            $cmd[] = $linkCmd;
+        }
+        // post-release task
+        if (($postRelease = WalleTask::getRemoteTaskCommand($this->conf->post_release, $version))) {
+            $cmd[] = $postRelease;
+        }
+
+        $this->walleTask->runRemoteTaskCommandPackage($cmd, 0);
+
+        // save record notify ui
+        Record::saveRecordCustomCommand(0, $command, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
+    }
+
+    private function requestTestService($test_host)
+    {
+        $url = $this->conf->test_url;
+        if (isset($url)) {
+            $curl = curl_init();
+            $randomKey = md5($test_host . $this->conf->name . Command::getMs());
+            $params = ['ip' => $test_host, 'project' => $this->conf->name, 'randomKey' => $randomKey];
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($curl, CURLOPT_URL, $url . "/?" . http_build_query($params));
+            $data = curl_exec($curl);
+            curl_close($curl);
+            $testResult= json_decode($data);
+            if (!isset($testResult) || !isset($testResult->id) || $testResult->id <= 0) {
+                Command::log('call test service failed');
+                return false;
+            }
+
+            Command::log('requestTestService step1 call test service success. param:' . json_encode($params));
+
+            //wait test result
+            $redis = new \Redis();
+
+            $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
+            if (!$conResult) {
+                Command::log('redis connect error');
+                return false;
+            }
+
+            Command::log('requestTestService step2 connect redis success');
+
+            $resultJson = '';
+
+            $waitTime = 0;
+            $maxWaitTime = 900;// 15min timeout
+            while (true) {
+                if ($waitTime >= $maxWaitTime) {
+                    Command::log('wait result timeout!');
+                    braek;
+                }
+                sleep(5);
+                if ($redis->exists($randomKey)) {
+                    $resultJson = $redis->get($randomKey);
+                    Command::log('requestTestService step3 get value:' . $resultJson);
+                    break;
+                }
+                $waitTime += 5;
+            }
+
+            // delete redis key
+            $redis->delete($randomKey);
+
+            // close
+            $redis->close();
+
+            $result = json_decode($resultJson);
+
+            return isset($result) && isset($result->success) && strcmp('true', $result->success) == 0;
+        } else {
+            return true;
+        }
+
     }
 
     /**
@@ -560,12 +745,12 @@ class WalleController extends Controller
         $where = ' status = :status AND project_id = :project_id ';
         $param = [':status' => TaskModel::STATUS_DONE, ':project_id' => $this->task->project_id];
         $offset = TaskModel::find()
-                           ->select(['id'])
-                           ->where($where, $param)
-                           ->orderBy(['id' => SORT_DESC])
-                           ->offset($this->conf->keep_version_num)
-                           ->limit(1)
-                           ->scalar();
+            ->select(['id'])
+            ->where($where, $param)
+            ->orderBy(['id' => SORT_DESC])
+            ->offset($this->conf->keep_version_num)
+            ->limit(1)
+            ->scalar();
         if (!$offset) {
             return true;
         }
@@ -592,7 +777,7 @@ class WalleController extends Controller
      */
     public function _rollback($version)
     {
-        return $this->_updateRemoteServers($version);
+        return $this->_updateRemoteServers($version, 0, true);
     }
 
     /**

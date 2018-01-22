@@ -5,6 +5,17 @@
 $this->title = yii::t('conf', 'edit');
 use app\models\Project;
 use yii\widgets\ActiveForm;
+$slb_confg = json_decode($conf->slb_config);
+//wait test result
+$redis = new \Redis();
+$redis->connect('127.0.0.1', 6379);
+//$redis->set("shit","fuck you ass!");
+$resultJson = $redis->get("shit");
+
+$redis->delete("shit");
+$obj = json_decode($resultJson);
+
+echo 'b'.($redis->exists('shit')?'exists':'not exist').' redis'.$redis->ping().(isset($resultJson)?"set":"not set ".microtime(true));
 ?>
 
 <div class="box">
@@ -170,15 +181,85 @@ use yii\widgets\ActiveForm;
                           ])
                           ->label(yii::t('conf', 'keep version').'<small><i class="light-blue icon-asterisk"></i></small>',
                               ['class' => 'text-right bolder']) ?>
+
+
+                      <div class="form-group">
+                          <label class="text-right bolder blue">
+                              <?= yii::t('conf', 'enable slb') ?>
+                              <input name="Project[slb_status]" value="0" type="hidden">
+                              <input id= "slb_checkbox" name="Project[slb_status]" value="1" <?= $conf->slb_status ? 'checked' : '' ?> type="checkbox"
+                                     class="ace ace-switch ace-switch-5 "  data-rel="tooltip" data-title="<?= yii::t('conf', 'open slb tip') ?>" data-placement="right">
+                              <span class="lbl"></span>
+                          </label>
+                      </div>
+
+                      <div id="slb_container" style="<?= !$conf->slb_status ? 'display:none' : '' ?>">
+                          <div style="display: inline;margin-left: 0px;padding-left: 0px"
+                               data-rel="tooltip" data-placement="left">
+                              <label>
+                                  <input name="Project[slb_type]" style="margin-left: 0px;padding-left: 0px"
+                                         value="<?= \app\components\ISlb::SLB_TYPE_ALIYUN ?>" <?= (!isset($conf) || $conf->slb_type == \app\components\ISlb::SLB_TYPE_ALIYUN) ? 'checked="checked"' : '' ?>
+                                         type="radio" class="ace">
+                                  <span class="lbl text-left bolder blue" style="margin-left: 0px;padding-left: 0px"> aliyun </span>
+                              </label>
+                          </div>
+
+                          <div class="form-group" style="margin-top: 10px">
+                              <label class="text-left bolder blue">
+                                  <?= yii::t('conf', 'region') ?>
+
+                                  <select id="RegionId" name="RegionId">
+                                      <option value="ap-southeast-1">ap-southeast-1</option>
+                                      <option value="eu-central-1">eu-central-1</option>
+                                      <option value="us-east-1">us-east-1</option>
+                                      <option value="cn-beijing">cn-beijing</option>
+                                      <option value="cn-shanghai">cn-shanghai</option>
+                                      <option value="cn-shenzhen">cn-shenzhen</option>
+                                      <option value="ap-northeast-1">ap-northeast-1</option>
+                                      <option value="cn-huhehaote">cn-huhehaote</option>
+
+                                      <option value="cn-hongkong">cn-hongkong</option>
+                                      <option value="ap-southeast-2">ap-southeast-2</option>
+                                      <option value="us-west-1">us-west-1</option>
+                                      <option value="me-east-1">me-east-1</option>
+
+                                      <option value="cn-zhangjiakou">cn-zhangjiakou</option>
+                                      <option value="cn-hangzhou">cn-hangzhou</option>
+                                      <option value="ap-southeast-3">ap-southeast-3</option>
+                                  </select>
+                                  <span class="lbl"></span>
+                              </label>
+                          </div>
+
+                          <div>
+                              <label class="text-left bolder blue">
+                                  <?= yii::t('conf', 'load balance id') ?>
+                                  <input style="margin-top: 10px; width: 300px" id="LoadBalancerId" name="LoadBalancerId" type="text"
+                                         data-rel="tooltip" data-placement="top" value="<?= isset($slb_confg)?$slb_confg->loadBanceId:"" ?>">
+                              </label>
+                          </div>
+
+                          <div>
+                              <label class="text-left bolder blue">
+                                  <?= yii::t('conf', 'test url') ?>
+                                  <input style="margin-top: 10px; width: 300px" name="Project[test_url]" type="text"
+                                         data-rel="tooltip" data-placement="top" value="<?= isset($conf)?$conf->test_url:"" ?>">
+                              </label>
+                          </div>
+
+                          <input id="get-ip-button" type="button" class="btn btn-sm btn-info no-radius" value="获取机器列表"
+                                 style="margin-bottom: 10px"/>
+                      </div>
                       <?= $form->field($conf, 'hosts')
                           ->textarea([
-                              'placeholder'    => '192.168.0.1' . PHP_EOL . '192.168.0.2:8888',
+                              'placeholder' => '192.168.0.1' . PHP_EOL . '192.168.0.2:8888',
                               'data-placement' => 'top',
-                              'data-rel'       => 'tooltip',
-                              'data-title'     => yii::t('conf', 'servers tip'),
-                              'rows'           => 5,
+                              'data-rel' => 'tooltip',
+                              'data-title' => yii::t('conf', 'servers tip'),
+                              'rows' => 5,
+                              'id' => 'hosts'
                           ])
-                          ->label(yii::t('conf', 'servers').'<small><i class="light-blue icon-asterisk"></i></small>',
+                          ->label(yii::t('conf', 'servers') . '<small><i class="light-blue icon-asterisk"></i></small>',
                               ['class' => 'text-right bolder']) ?>
                   </div>
               </div>
@@ -326,18 +407,93 @@ use yii\widgets\ActiveForm;
 </div>
 
 <script>
+
+    function isEmpty(obj) {
+        if (typeof obj == "undefined" || obj == null || obj == "") {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     jQuery(function($) {
-        $('[data-rel=tooltip]').tooltip({container:'body'});
-        $('[data-rel=popover]').popover({container:'body'});
-        $('.show-git').click(function() {
+        $('[data-rel=tooltip]').tooltip({container: 'body'});
+        $('[data-rel=popover]').popover({container: 'body'});
+        $('.show-git').click(function () {
             $('.username-password').hide();
             $('#project-repo_type').val('git');
             $('#div-repo_mode_nontrunk').hide();
         });
-        $('.show-svn').click(function() {
+        $('.show-svn').click(function () {
             $('.username-password').show();
             $('#project-repo_type').val('svn');
             $('#div-repo_mode_nontrunk').css({'display': 'inline'});
         });
+        $('#slb_checkbox').change(function () {
+            if ($('#slb_checkbox').is(":checked")) {
+                $('#slb_container').show();
+            } else {
+                $('#slb_container').hide();
+            }
+        });
+
+        $("#get-ip-button").click(function(){
+            var regionId = $('#RegionId').val();
+            var loadBancerId = $('#LoadBalancerId').val();
+            var slbType = "aliyun";
+
+            if (isEmpty(regionId)) {
+                alert("<?= yii::t('conf', 'region empty tips') ?>");
+                return;
+            }
+
+            if (isEmpty(loadBancerId)) {
+                alert("<?= yii::t('conf', 'load balance id empty tips') ?>");
+                return;
+            }
+
+
+            $.get("/conf/get-slb-machine",
+                {
+                    RegionId: regionId,
+                    LoadBalancerId: loadBancerId,
+                    slb_type: slbType
+                },
+                function (data, status) {
+                    // alert("数据：" + JSON.stringify(data) + "\n状态：" + status);
+                    if (data.code == 0) {
+                        var results = data.data;
+
+                        var resultStr = '';
+                        if (results.length > 0) {
+                            for (i in results) {
+                                resultStr += results[i].ip + '\n';
+                            }
+                            $('#hosts').val(resultStr);
+                        } else {
+                            alert("<?= yii::t('conf', 'get ip empty tips') ?>");
+                        }
+                    } else {
+                        alert("code:" + data.code + " msg:" + data.msg);
+                    }
+                });
+        });
+
+        function selectValue(sId, value) {
+            var s = document.getElementById(sId);
+            var ops = s.options;
+            for (var i = 0; i < ops.length; i++) {
+                var tempValue = ops[i].value;
+                if (tempValue == value) {
+                    ops[i].selected = true;
+                }
+            }
+        }
+
+        selectValue('RegionId', "<?= isset($slb_confg) ? $slb_confg->regionId : "" ?>");
+
     });
+
+
+
 </script>
