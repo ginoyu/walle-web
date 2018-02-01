@@ -53,5 +53,6 @@ return [
     "unknown slb type" => "unKnow slb type",
     'slb switch error' => 'SLB switch error',
     'slb test error'=>'SLB test error',
-    'redis connect error'=>'redis connect failed'
+    'redis connect error'=>'redis connect failed',
+    'manual weight error'=>'project manual weight set error',
 ];

@@ -10,6 +10,7 @@ namespace app\controllers;
 
 use app\components\AliyunSlb;
 use app\components\Controller;
+use app\components\DingDingBot;
 use app\components\ISlb;
 use app\components\SlbFactory;
 
@@ -78,7 +79,7 @@ class TestController extends Controller
             AliyunSlb::KEY_ACCESSKEY_SECRECT => $this->mAccessKeySecret,
             AliyunSlb::KEY_REGION_ID => $this->mRegionId,
             AliyunSlb::KEY_LOAD_BALANCE_ID => $this->mLoadBanceId
-        ],'39.107.74.182',100);
+        ],'39.106.208.2',100);
         print_r($data);
     }
 
@@ -148,6 +149,12 @@ class TestController extends Controller
 //            AliyunSlb::KEY_LOAD_BALANCE_ID => $this->mLoadBanceId
 //        ]);
         $slb->getEcsIpList($config);
+    }
+
+    public function actionSendMessage($message = '')
+    {
+        $dingding = new DingDingBot('a612b4ec7f38c07d6653bcfabf8aa423dd70d87a75b2a5ae0b96f9b398d9a252');
+        $dingding->sendToAll($message);
     }
 
     private function requestAliSlbService($params)

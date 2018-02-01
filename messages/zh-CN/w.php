@@ -16,11 +16,21 @@ return [
     'task_status_3' => '上线完成',
     'task_status_4' => '上线失败',
 
+    'task_status_5' => '技术审核通过',
+    'task_status_6' => '测试审核通过',
+    'task_status_7' => '测试审核拒绝',
+    'task_status_8' => '运维审核拒绝',
+
     'task_status_0_color' => 'text-primary',
     'task_status_1_color' => '',
     'task_status_2_color' => 'text-warning',
     'task_status_3_color' => 'text-success',
     'task_status_4_color' => 'text-danger',
+
+    'task_status_5_color' => 'text-success',
+    'task_status_6_color' => 'text-success',
+    'task_status_7_color' => 'text-warning',
+    'task_status_8_color' => 'text-warning',
 
     'conf_level_1' => '测试环境',
     'conf_level_2' => '预发布环境',
@@ -41,6 +51,7 @@ return [
     'js delete failed' => '删除失败：',
 
     'you are not master of project' => '不可以操作其它人的项目：(',
+    'permission error' =>'权限和状态错误',
     'delete' => '删除',
     'edit' => '编辑',
     'delete failed' => '删除失败',

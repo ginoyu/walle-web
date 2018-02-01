@@ -6,16 +6,6 @@ $this->title = yii::t('conf', 'edit');
 use app\models\Project;
 use yii\widgets\ActiveForm;
 $slb_confg = json_decode($conf->slb_config);
-//wait test result
-$redis = new \Redis();
-$redis->connect('127.0.0.1', 6379);
-//$redis->set("shit","fuck you ass!");
-$resultJson = $redis->get("shit");
-
-$redis->delete("shit");
-$obj = json_decode($resultJson);
-
-echo 'b'.($redis->exists('shit')?'exists':'not exist').' redis'.$redis->ping().(isset($resultJson)?"set":"not set ".microtime(true));
 ?>
 
 <div class="box">
@@ -27,6 +17,13 @@ echo 'b'.($redis->exists('shit')?'exists':'not exist').' redis'.$redis->ping().(
             ])
             ->label(yii::t('conf', 'name'), ['class' => 'text-right bolder blue col-sm-1']) ?>
 
+        <div class="clearfix"></div>
+
+        <?= $form->field($conf, 'ding_token')
+            ->textInput([
+                'class'          => 'col-sm-11',
+            ])
+            ->label(yii::t('conf', 'ding token'), ['class' => 'text-right bolder blue col-sm-1']) ?>
         <div class="clearfix"></div>
         <?= $form->field($conf, 'level')->dropDownList([
             Project::LEVEL_TEST => \Yii::t('w', 'conf_level_' . Project::LEVEL_TEST),
@@ -244,6 +241,15 @@ echo 'b'.($redis->exists('shit')?'exists':'not exist').' redis'.$redis->ping().(
                                   <?= yii::t('conf', 'test url') ?>
                                   <input style="margin-top: 10px; width: 300px" name="Project[test_url]" type="text"
                                          data-rel="tooltip" data-placement="top" value="<?= isset($conf)?$conf->test_url:"" ?>">
+                              </label>
+                          </div>
+
+                          <div>
+                              <label class="text-left bolder blue">
+                                  <?= yii::t('conf', 'manual test weight') ?>
+                                  <input style="margin-top: 10px; width: 300px" name="manual_weight" type="text"
+                                         data-rel="tooltip" data-placement="top"
+                                         value="<?= isset($slb_confg) && isset($slb_confg->manualWeight) ? $slb_confg->manualWeight : "" ?>">
                               </label>
                           </div>
 

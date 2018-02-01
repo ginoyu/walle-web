@@ -54,6 +54,11 @@ use yii\helpers\Url;
                 <th><?= yii::t('task', 'l_branch') ?></th>
                 <th><?= yii::t('task', 'l_commit') ?></th>
                 <th><?= yii::t('task', 'l_status') ?></th>
+                <?php if ($audit) { ?>
+                    <th><?= yii::t('task', 'l_tec_audit') ?></th>
+                    <th><?= yii::t('task', 'l_test_audit') ?></th>
+                    <th><?= yii::t('task', 'l_ops_audit') ?></th>
+                <?php } ?>
                 <th><?= yii::t('task', 'l_opera') ?></th>
             </tr>
             <?php foreach ($list as $item) { ?>
@@ -69,18 +74,34 @@ use yii\helpers\Url;
                     <td><?= $item['commit_id'] ?></td>
                     <td class="<?= \Yii::t('w', 'task_status_' . $item['status'] . '_color') ?>">
                         <?= \Yii::t('w', 'task_status_' . $item['status']) ?></td>
+                    <?php if ($audit) { ?>
+                        <td>
+                            <label>
+                                <input class="ace ace-switch ace-switch-5 task-operation"
+                                    <?= \app\components\PermissionHelper::isAdminChecked($item['status']) ? 'checked' : '' ?>
+                                       type="checkbox"
+                                       data-id="<?= $item['id'] ?>" <?= (\app\models\Group::isAdmin($permission[$item['project_id']]) && in_array($item['status'], \app\components\PermissionHelper::getTecLeaderOpStatus())) ? '' : 'disabled' ?>>
+                                <span class="lbl"></span>
+                            </label>
+                        </td>
+                        <td><label>
+                                <input class="ace ace-switch ace-switch-5 task-operation1"
+                                    <?= \app\components\PermissionHelper::isTestChecked($item['status']) ? 'checked' : '' ?>
+                                       type="checkbox" data-id="<?= $item['id'] ?>"
+                                    <?= (\app\models\Group::isTester($permission[$item['project_id']]) && in_array($item['status'], \app\components\PermissionHelper::getTestLeaderOpStatus())) ? '' : 'disabled' ?>>
+                                <span class="lbl"></span>
+                            </label></td>
+                        <td><label>
+                                <input class="ace ace-switch ace-switch-5 task-operation2"
+                                    <?= \app\components\PermissionHelper::isOpsChecked($item['status']) ? 'checked' : '' ?>
+                                       type="checkbox" data-id="<?= $item['id'] ?>"
+                                    <?= (\app\models\Group::isOperation($permission[$item['project_id']]) && in_array($item['status'], \app\components\PermissionHelper::getOpsLeaderOpStatus())) && $item['project']['audit'] == \app\models\Project::AUDIT_YES ? '' : 'disabled' ?>>
+                                <span class="lbl"></span>
+                            </label></td>
+                    <?php } ?>
                     <td>
                         <div class="action-buttons">
-                            <?php if ($audit && !in_array($item['status'],
-                                    [Task::STATUS_DONE, Task::STATUS_FAILED])
-                            ) { ?>
-                                <label>
-                                    <input class="ace ace-switch ace-switch-5 task-operation"
-                                        <?= $item['status'] == Task::STATUS_PASS ? 'checked' : '' ?>
-                                           type="checkbox" data-id="<?= $item['id'] ?>">
-                                    <span class="lbl"></span>
-                                </label>
-                            <?php } ?>
+
                             <?php if ($item['user_id'] == \Yii::$app->user->id) { ?>
                                 <!-- 通过审核可以上线的任务-->
                                 <?php if (Task::canDeploy($item['status'])) { ?>
@@ -122,7 +143,8 @@ use yii\helpers\Url;
             $this = $(this);
             $.get("<?= Url::to('@web/task/task-operation') ?>", {
                     id: $this.data('id'),
-                    operation: $this.is(':checked') ? 1 : 0
+                    operation: $this.is(':checked') ? 1 : 0,
+                    user_type:<?=\app\models\Group::TYPE_ADMIN?>
                 },
                 function(data) {
                     if(data.code == 0) {
@@ -132,7 +154,41 @@ use yii\helpers\Url;
                     }
                 }
             );
-        })
+        });
+
+        $('.task-operation1').click(function() {
+            $this = $(this);
+            $.get("<?= Url::to('@web/task/task-operation') ?>", {
+                    id: $this.data('id'),
+                    operation: $this.is(':checked') ? 1 : 0,
+                    user_type:<?=\app\models\Group::TYPE_TESTER?>
+                },
+                function(data) {
+                    if(data.code == 0) {
+                        window.location.reload();
+                    } else {
+                        alert(data.msg);
+                    }
+                }
+            );
+        });
+
+        $('.task-operation2').click(function() {
+            $this = $(this);
+            $.get("<?= Url::to('@web/task/task-operation') ?>", {
+                    id: $this.data('id'),
+                    operation: $this.is(':checked') ? 1 : 0,
+                    user_type:<?=\app\models\Group::TYPE_OPERATIONS?>
+                },
+                function(data) {
+                    if(data.code == 0) {
+                        window.location.reload();
+                    } else {
+                        alert(data.msg);
+                    }
+                }
+            );
+        });
         // 回滚任务
         $('.task-rollback').click(function(e) {
             $this = $(this);

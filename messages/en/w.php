@@ -16,11 +16,21 @@ return [
     'task_status_3' => 'done',
     'task_status_4' => 'failed',
 
+    'task_status_5' => 'tec pass',
+    'task_status_6' => 'test pass',
+    'task_status_7' => 'test refuse',
+    'task_status_8' => 'ops refuse',
+
     'task_status_0_color' => 'text-primary',
     'task_status_1_color' => '',
     'task_status_2_color' => 'text-warning',
     'task_status_3_color' => 'text-success',
     'task_status_4_color' => 'text-danger',
+
+    'task_status_5_color' => 'text-success',
+    'task_status_6_color' => 'text-success',
+    'task_status_7_color' => 'text-warning',
+    'task_status_8_color' => 'text-warning',
 
     'conf_level_1' => 'Test',
     'conf_level_2' => 'Pre-Release',
@@ -41,6 +51,7 @@ return [
     'js delete failed' => 'Delete failed: ',
 
     'you are not master of project' => 'you are not master of project：(',
+    'permission error' =>'permission and status error!',
     'delete' => 'delete',
     'edit' => 'edit',
     'delete failed' => 'delete failed',

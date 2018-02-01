@@ -22,6 +22,7 @@ use app\components\GlobalHelper;
  * @property integer $updated_at
  * @property string $branch
  * @property string $file_list
+ * @property string $remark
  */
 class Task extends \yii\db\ActiveRecord
 {
@@ -59,6 +60,26 @@ class Task extends \yii\db\ActiveRecord
      * 任务上线失败
      */
     const STATUS_FAILED = 4;
+
+    /**
+     * 技术经理审核通过
+     */
+    const STATUS_TEC_LEADER_PASS = 5;
+
+    /**
+     * 测试审核通过
+     */
+    const STATUS_TEST_LEADER_PASS = 6;
+
+    /**
+     * 测试审核拒绝
+     */
+    const STATUS_TEST_LEADER_FAILED = 7;
+
+    /**
+     * 运维审核拒绝
+     */
+    const STATUS_OPS_LEADER_FAILED = 8;
 
     /**
      * 可回滚
@@ -112,7 +133,7 @@ class Task extends \yii\db\ActiveRecord
             [['user_id', 'project_id', 'status', 'title'], 'required'],
             [['user_id', 'project_id', 'action', 'status', 'file_transmission_mode'], 'integer'],
             [['created_at', 'updated_at'], 'safe'],
-            [['file_list'], 'string'],
+            [['file_list','remark'], 'string'],
             [['title', 'link_id', 'ex_link_id', 'commit_id', 'branch'], 'string', 'max' => 100],
         ];
     }

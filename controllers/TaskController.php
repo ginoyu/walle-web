@@ -2,6 +2,8 @@
 
 namespace app\controllers;
 
+use app\components\PermissionHelper;
+use app\models\User;
 use yii;
 use yii\data\Pagination;
 use yii\helpers\Url;
@@ -56,6 +58,9 @@ class TaskController extends Controller
             $list->orWhere(['project_id' => $auditProjects]);
         }
 
+        $permissionArray = Group::getUserProject($this->uid);
+//        print_r(Group::getUserProject($this->uid));
+
         $kw = \Yii::$app->request->post('kw');
         if ($kw) {
             $list->andWhere(['or', "commit_id like '%" . $kw . "%'", "title like '%" . $kw . "%'"]);
@@ -80,7 +85,8 @@ class TaskController extends Controller
             'audit' => $auditProjects,
             'projects' => $projects,
             'kw' => $kw,
-            'projectId' => $projectId
+            'projectId' => $projectId,
+            'permission' => $permissionArray
         ]);
     }
 
@@ -136,6 +142,18 @@ class TaskController extends Controller
                 $task->project_id = $projectId;
                 $task->status = $status;
                 if ($task->save()) {
+                    if ($conf->audit == Project::AUDIT_YES) {
+                        $adminIds = Group::getAdminTypeIds($task->project_id);
+                        if (isset($adminIds) && is_array($adminIds) && count($adminIds) > 0) {
+                            $user = User::findIdentity($adminIds[0]);
+                            Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
+                                ->setFrom(Yii::$app->mail->messageConfig['from'])
+                                ->setTo($user->email)
+                                ->setSubject('瓦力平台 - ' . $user->realname)
+                                ->send();
+                        }
+                    }
+
                     return $this->redirect('@web/task/');
                 }
             }
@@ -224,19 +242,60 @@ class TaskController extends Controller
      * @param $id
      * @param $operation
      */
-    public function actionTaskOperation($id, $operation)
+    public function actionTaskOperation($id, $operation, $user_type)
     {
         $task = Task::findOne($id);
         if (!$task) {
             static::renderJson([], -1, yii::t('task', 'unknown deployment bill'));
         }
+
+        $db_usr_type = Group::getUserProject($this->uid)[$task->project_id];
+
         // 是否为该项目的审核管理员（超级管理员可以不用审核，如果想审核就得设置为审核管理员，要不只能维护配置）
-        if (!Group::isAuditAdmin($this->uid, $task->project_id)) {
+        if (!($db_usr_type & $user_type)) {
             throw new \Exception(yii::t('w', 'you are not master of project'));
         }
 
-        $task->status = $operation ? Task::STATUS_PASS : Task::STATUS_REFUSE;
+        $status = PermissionHelper::getStatus($user_type, $operation, $task->status);
+        if ($status == -1) {
+            throw new \Exception(yii::t('w', 'permission error'));
+        }
+
+        $task->status = $status;
         $task->save();
+
+
+        // email notify task owner
+        if ($task->status == Task::STATUS_PASS ||
+            $task->status == Task::STATUS_REFUSE ||
+            $task->status == Task::STATUS_TEST_LEADER_FAILED ||
+            $task->status == Task::STATUS_OPS_LEADER_FAILED) {
+            $user = User::findIdentity($task->user_id);
+            Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 0])
+                ->setFrom(Yii::$app->mail->messageConfig['from'])
+                ->setTo($user->email)
+                ->setSubject('瓦力平台 - ' . $user->realname)
+                ->send();
+        } else {
+            $adminType = Group::TYPE_TESTER;
+            if ($status == Task::STATUS_TEC_LEADER_PASS) {
+                $adminType = Group::TYPE_TESTER;
+            } else if ($status == Task::STATUS_TEST_LEADER_PASS) {
+                $adminType = Group::TYPE_OPERATIONS;
+            }
+            $adminIds = Group::getAdminTypeIds($task->project_id, $adminType);
+            if (isset($adminIds) && is_array($adminIds) && count($adminIds) > 0) {
+                $user = User::findIdentity($adminIds[0]);
+                Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
+                    ->setFrom(Yii::$app->mail->messageConfig['from'])
+                    ->setTo($user->email)
+                    ->setSubject('瓦力平台 - ' . $user->realname)
+                    ->send();
+            }
+
+
+        }
+
         static::renderJson(['status' => \Yii::t('w', 'task_status_' . $task->status)]);
     }
 

@@ -41,9 +41,10 @@ class ConfController extends Controller
         $groupTable   = Group::tableName();
         $projectTable = Project::tableName();
         // 显示该用户为管理员的所有项目
+
         $project = Project::find()
             ->leftJoin(Group::tableName(), "`$groupTable`.`project_id`=`$projectTable`.`id`")
-            ->where(["`$groupTable`.`user_id`" => $this->uid, "`$groupTable`.`type`" => Group::TYPE_ADMIN]); 
+            ->where(['and', "`$groupTable`.`user_id`=:uid", ['in', "`$groupTable`.`type`", Group::getAdminTypes()]], [':uid' => $this->uid]);
 
         $kw = \Yii::$app->request->post('kw');
         if ($kw) {
@@ -227,11 +228,12 @@ class ConfController extends Controller
             throw new \Exception(yii::t('conf', 'relation not exists'));
         }
         $project = $this->findModel($group->project_id);
-        if (!in_array($type, [Group::TYPE_ADMIN, Group::TYPE_USER])) {
+        if ($type > bindec('111')) {
             throw new \Exception(yii::t('conf', 'unknown relation type'));
         }
         $group->type = (int)$type;
         if (!$group->save()) throw new \Exception(yii::t('w', 'update failed'));
+        Command::log('update type is:' . $type);
         $this->renderJson([]);
     }
 

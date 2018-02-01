@@ -13,6 +13,7 @@ return [
 
     'edit' => '配置项目',
     'name' => '项目名字:',
+    'ding token' => '钉钉token:',
     'env' => '项目环境:',
     'url' => '地址:',
     'username' => '用户名:',
@@ -65,6 +66,10 @@ return [
     'audit manager tip' => '审核管理员可审核上线单',
     'add audit manager' => '设为审核管理员',
     'cancel audit manager' => '取消审核管理员',
+    'add tester manager' => '设为测试管理员',
+    'cancel tester manager' => '取消测试管理员',
+    'add ops manager' => '设为运维管理员',
+    'cancel ops manager' => '取消运维管理员',
     'js set audit manager failed' => '设置失败: ',
 
     'index' => '项目配置',
@@ -97,5 +102,6 @@ return [
     'region empty tips' => 'regionId不能为空',
     'load balance id empty tips' => 'LoadBalanceId不能为空',
     'get ip empty tips' => '获取到的ip数据为空，请检查配置参数是否正确',
-    'test url' => '项目测试地址:'
+    'test url' => '项目测试地址:',
+    'manual test weight' => '手动测试slb weight:'
 ];

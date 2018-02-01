@@ -68,6 +68,15 @@ use app\models\Task;
                   ['class' => 'control-label bolder blue', 'style' => 'display: none']) ?>
           <!-- 文件列表 end -->
 
+          <?= $form->field($task, 'remark')
+              ->textarea([
+                  'data-placement' => 'top',
+                  'data-rel' => 'tooltip',
+                  'rows' => 5,
+                  'id' => 'hosts'
+              ])
+              ->label(yii::t('task', 'remark'),['class' => 'control-label bolder blue']) ?>
+
       </div><!-- /.box-body -->
 
       <div class="box-footer">

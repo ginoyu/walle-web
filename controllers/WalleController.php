@@ -12,12 +12,14 @@ namespace app\controllers;
 use app\components\Ansible;
 use app\components\Command;
 use app\components\Controller;
+use app\components\DingDingBot;
 use app\components\Folder;
 use app\components\GlobalHelper;
 use app\components\ISlb;
 use app\components\Repo;
 use app\components\SlbFactory;
 use app\components\Task as WalleTask;
+use app\components\TaskStateManager;
 use app\models\Project;
 use app\models\Group;
 use app\models\Record;
@@ -79,6 +81,10 @@ class WalleController extends Controller
         // 清除历史记录
         Record::deleteAll(['task_id' => $this->task->id]);
 
+        $taskStateManager = new TaskStateManager();
+        $taskStateManager->setRunningTask($taskId);
+
+
         // 项目配置
         $this->conf = Project::getConf($this->task->project_id);
         $this->walleTask = new WalleTask($this->conf);
@@ -118,6 +124,10 @@ class WalleController extends Controller
             // 记录当前线上版本（软链）回滚则是回滚的版本，上线为新版本
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
+
+            $dingding = new DingDingBot($this->conf->ding_token);
+            $dingding->sendToAll('上线单:'.$this->task->title.'  '.'上线成功');
+
         } catch (\Exception $e) {
             Command::log('exception happend!' . $e->getTraceAsString());
             $this->task->status = TaskModel::STATUS_FAILED;
@@ -125,8 +135,13 @@ class WalleController extends Controller
             // 清理本地部署空间
             $this->_cleanUpLocal($this->task->link_id);
 
+            $taskStateManager->clearRunningTaskState($taskId);
+
+            $dingding = new DingDingBot($this->conf->ding_token);
+            $dingding->sendToAll('上线单:'.$this->task->title.'  '.'上线失败');
             throw $e;
         }
+        $taskStateManager->clearRunningTaskState($taskId);
         $this->renderJson([]);
     }
 
@@ -386,11 +401,38 @@ class WalleController extends Controller
         $this->renderJson($record);
     }
 
+    /**
+     * get host task process
+     *
+     * @param $taskId
+     * @param $hosts
+     */
+    public function actionGetTaskProcess($taskId, $hosts)
+    {
+        $host_array = \app\components\GlobalHelper::str2arr($hosts);
+
+        $taskStateManager = new TaskStateManager();
+
+        $resultArray = [];
+        foreach ($host_array as $host) {
+            $result = (object)array();
+            $result->host = $host;
+            $result->status = $taskStateManager->getStatus($taskId, $host);
+            $result->progress = $taskStateManager->getProgress($taskId, $host);
+            $resultArray[] = $result;
+        }
+
+        $this->renderJson($resultArray);
+    }
+
+    /**
+     * notify auto and manual test result
+     */
     public function actionNotifyTestResult()
     {
         $params = \Yii::$app->request->get();
         $redis = new \Redis();
-        $conResult = $redis->connect('127.0.0.1', 6379);
+        $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
         $code = 0;
         $msg = 'success';
         if (!$conResult) {
@@ -405,6 +447,23 @@ class WalleController extends Controller
                 Command::log('redis value set success:' . $redis->get($params['randomKey']));
             }
         }
+        $this->renderJson($params, $code, $msg);
+    }
+
+    public function actionManualTestPass($taskId)
+    {
+        $params = \Yii::$app->request->get();
+        $code = 0;
+        $msg = 'success';
+
+        $taskManger = new TaskStateManager();
+        if (!$taskManger->isRunningTask($taskId)) {
+            $code = -110;
+            $msg = 'task ' . $taskId . ' is not running!';
+        } else {
+            $taskManger->setTaskManualTestAllPass($taskId);
+        }
+
         $this->renderJson($params, $code, $msg);
     }
 
@@ -587,49 +646,99 @@ class WalleController extends Controller
             $executeResult = true;
             $errMsg = '';
             $errorCommand = '';
+            $slbConfig = SlbFactory::getSlbConfig($this->conf);
+            $statusManager = new TaskStateManager();
             foreach ($hosts as $host) {
+                $statusManager->clearStatus($this->task->id, $host);
+
+                $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_UPDATING_SERVER);
                 $ret = $this->walleTask->runRemoteTaskCommandByHost($cmd, $delay, $host);
                 if (!$ret) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_UPDATE_SERVER_FAILED);
                     $errorCommand = var_export($this->walleTask->getExeCommand());
                     $errMsg = yii::t('walle', 'update servers error');
                     $executeResult = false;
                     break;
                 }
 
-                Command::log('step1 remote server:'.$host.' update files success');
+                Command::log('step1 remote server:' . $host . ' update files success');
+
+                $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_AUTO_TEST);
 
                 // slb switch
-                $switchRet = $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, 0);
+                $switchRet1 = $slb->setBackendServerWeight($slbConfig, $host, 0);
 
-                if (!$switchRet) {
+                $originWeight = $switchRet1['originWeight'];
+
+                if (!$switchRet1) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DO_AUTO_TEST_FAILED);
                     $errorCommand = 'switch slb host:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'slb switch error');
                     $executeResult = false;
                     break;
                 }
 
-                Command::log('step2 remote server:'.$host.' switch slb 0 success!');
+                Command::log('step2 remote server:' . $host . ' switch slb 0 success!');
                 // call test url
                 $testRet = $this->requestTestService($host);
                 if (!$testRet) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DO_AUTO_TEST_FAILED);
                     $errorCommand = 'execute test host:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'slb test error');
                     $executeResult = false;
-                    $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, $switchRet['originWeight']);
+                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
                     break;
                 }
 
-                Command::log('step3 remote server:'.$host.' test success');
-                //slb switch
-                $switchRet = $slb->setBackendServerWeight(SlbFactory::getSlbConfig($this->conf), $host, $switchRet['originWeight']);
+                Command::log('step3 remote server:' . $host . ' test success');
+
+                // manual test
+                $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST);
+                $manualWeight = $slbConfig['manualWeight'];
+                if ($manualWeight <= 0) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
+                    $errorCommand = 'project conf error manual weight should not be 0';
+                    $errMsg = yii::t('walle', 'manual weight error');
+                    $executeResult = false;
+                    break;
+                }
+
+                Command::log('step4 remote server:' . $host . ' update manual doing success');
+                // manual test switch slb
+                $switchRet = $slb->setBackendServerWeight($slbConfig, $host, $manualWeight);
+
                 if (!$switchRet) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
+                    $errorCommand = 'switch manual slb host:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'slb switch error');
+                    $executeResult = false;
+                    break;
+                }
+
+                Command::log('step5 remote server:' . $host . ' update manual switch slb success');
+                $manualTestRet = $this->waitManualTestResult($host);
+                if (!$manualTestRet) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
+                    $errorCommand = 'manual test:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'manual test error');
+                    $executeResult = false;
+                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
+                    break;
+                }
+
+                Command::log('step6 remote server:' . $host . ' update manual test success');
+                //slb switch
+                $switchRet = $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
+                if (!$switchRet) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
                     $errorCommand = 'final switch slb host:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'slb switch error');
                     $executeResult = false;
                     break;
                 }
-                Command::log('step4 remote server:'.$host.' switch slb 100 success');
 
+                $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_ONLINE_SUCCESS);
+                Command::log('step7 remote server:' . $host . ' switch origin ' . $originWeight . 'slb success');
             }
 
             if (!$executeResult) {
@@ -675,7 +784,7 @@ class WalleController extends Controller
     private function requestTestService($test_host)
     {
         $url = $this->conf->test_url;
-        if (isset($url)) {
+        if (isset($url) && !empty($url)) {
             $curl = curl_init();
             $randomKey = md5($test_host . $this->conf->name . Command::getMs());
             $params = ['ip' => $test_host, 'project' => $this->conf->name, 'randomKey' => $randomKey];
@@ -705,11 +814,11 @@ class WalleController extends Controller
             $resultJson = '';
 
             $waitTime = 0;
-            $maxWaitTime = 900;// 15min timeout
+            $maxWaitTime = \Yii::$app->params['auto.timeout'];// 15min timeout
             while (true) {
                 if ($waitTime >= $maxWaitTime) {
                     Command::log('wait result timeout!');
-                    braek;
+                    break;
                 }
                 sleep(5);
                 if ($redis->exists($randomKey)) {
@@ -733,6 +842,60 @@ class WalleController extends Controller
             return true;
         }
 
+    }
+
+    private function waitManualTestResult($host)
+    {
+
+        $redis = new \Redis();
+
+        $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
+        if (!$conResult) {
+            Command::log('manual test redis connect error');
+            return false;
+        }
+        $taskId = $this->task->id;
+
+        $randomKey = TaskStateManager::getManualResultKey($taskId, $host);
+
+        $waitTime = 0;
+        $maxWaitTime = \Yii::$app->params['manual.timeout'];// 15min timeout
+        $resultJson = false;
+        $skipManualTest = false;
+        $skipManualTestKey = TaskStateManager::getTaskManualTestAllPassKey($taskId);
+        while (true) {
+            if ($waitTime >= $maxWaitTime) {
+                Command::log('wait manual result timeout!');
+                break;
+            }
+
+            if ($redis->exists($skipManualTestKey)) {
+                $skipManualTest = $redis->get($skipManualTestKey) > 0;
+                if ($skipManualTest) {
+                    Command::log('waitManualTestResult skip manual test!');
+                    break;
+                }
+            }
+
+            sleep(1);
+            if ($redis->exists($randomKey)) {
+                $resultJson = $redis->get($randomKey);
+                Command::log('waitManualTestResult get value:' . $resultJson);
+                break;
+            }
+            $waitTime += 1;
+        }
+
+
+        // delete redis key
+        $redis->delete($randomKey);
+
+        // close
+        $redis->close();
+
+        $result = json_decode($resultJson);
+
+        return isset($result) && isset($result->success) && strcmp('true', $result->success) == 0 || $skipManualTest;
     }
 
     /**

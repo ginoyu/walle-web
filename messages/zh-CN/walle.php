@@ -63,6 +63,12 @@ return [
     'account pattern could not defined' => '用户搜索模式未定义',
     "unknown slb type" => "未知的slb的类型",
     'slb switch error' => 'SLB流量切换出错',
-    'slb test error'=>'SLB服务测试出错',
-    'redis connect error'=>'redis连接失败'
+    'slb test error'=>'服务测试失败',
+    'redis connect error'=>'redis连接失败',
+    'manual weight error'=>'项目配置手动测试slb weight错误',
+    'manual test error'=>'手动测试服务失败',
+    'machine list'=>'机器列表：',
+    'sub status 1' => 'pre-release、更新版本、post-release',
+    'sub status 2' => '自动化测试',
+    'sub status 3' => '人工测试',
 ];

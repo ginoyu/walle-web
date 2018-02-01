@@ -53,7 +53,7 @@ use app\models\Group;
 
             <div class="body">
                 <div class="name">
-                    <?php if ($relation['type'] == Group::TYPE_ADMIN) { ?>
+                    <?php if (Group::isAdmin($relation['type'])) { ?>
                         <i class="icon-user-md light-orange bigger-110" title="<?= yii::t('conf', 'audit manager') ?>"></i>
                     <?php } ?>
                     <?= $relation['user']['realname'] ?>
@@ -71,11 +71,26 @@ use app\models\Group;
                     <div class="hr dotted hr-8"></div>
 
                     <div class="tools action-buttons">
-                        <a href="javascript:;" class="bind-admin" data-id="<?= $relation['id'] ?>" data-type="<?= (int)!$relation['type'] ?>" title="<?= yii::t('conf', 'audit manager tip') ?>">
+                        <a href="javascript:;" class="bind-admin" data-id="<?= $relation['id'] ?>"
+                           data-type="<?= Group::getOppositeAdmin($relation['type']) ?>"
+                           title="<?= yii::t('conf', 'audit manager tip') ?>">
                             <i class="icon-user-md light-orange bigger-110"></i>
-                            <?= $relation['type'] == Group::TYPE_USER ? yii::t('conf', 'add audit manager') : yii::t('conf', 'cancel audit manager') ?>
+                            <?= !Group::isAdmin($relation['type']) ? yii::t('conf', 'add audit manager') : yii::t('conf', 'cancel audit manager') ?>
+                        </a><br/>
+                        <a href="javascript:;" class="bind-admin1" data-id="<?= $relation['id'] ?>"
+                           data-type="<?= Group::getOppositeTester($relation['type']) ?>"
+                           title="<?= yii::t('conf', 'audit manager tip') ?>">
+                            <i class="icon-user-md light-orange bigger-110"></i>
+                            <?= !Group::isTester($relation['type']) ? yii::t('conf', 'add tester manager') : yii::t('conf', 'cancel tester manager') ?>
+                        </a><br/>
+                        <a href="javascript:;" class="bind-admin2" data-id="<?= $relation['id'] ?>"
+                           data-type="<?= Group::getOppositeOperations($relation['type']) ?>"
+                           title="<?= yii::t('conf', 'audit manager tip') ?>">
+                            <i class="icon-user-md light-orange bigger-110"></i>
+                            <?= !Group::isOperation($relation['type']) ? yii::t('conf', 'add ops manager') : yii::t('conf', 'cancel ops manager') ?>
                         </a>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -85,7 +100,24 @@ use app\models\Group;
 </div>
 
 <script>
+
+
     jQuery(function($) {
+
+        function click_type(e) {
+            $this = $(this);
+            var url = '<?= Url::to('@web/conf/edit-relation') ?>'
+                + '?id=' + $this.data('id')
+                + '&type=' + $this.data('type');
+            $.get(url , function(o) {
+                if (!o.code) {
+                    location.reload()
+                } else {
+                    alert('<?= yii::t('conf', 'js set audit manager failed') ?>' + o.msg);
+                }
+            })
+        };
+
         // 组关系删除
         $('.remove-relation').click(function(e) {
             $this = $(this);
@@ -98,7 +130,7 @@ use app\models\Group;
                     }
                 })
             }
-        })
+        });
         // 组关系成员设为管理员
         $('.bind-admin').click(function(e) {
             $this = $(this);
@@ -112,7 +144,35 @@ use app\models\Group;
                     alert('<?= yii::t('conf', 'js set audit manager failed') ?>' + o.msg);
                 }
             })
-        })
+        });
+        $('.bind-admin1').click(function (e) {
+            $this = $(this);
+            var url = '<?= Url::to('@web/conf/edit-relation') ?>'
+                + '?id=' + $this.data('id')
+                + '&type=' + $this.data('type');
+            $.get(url , function(o) {
+                if (!o.code) {
+                    location.reload()
+                } else {
+                    alert('<?= yii::t('conf', 'js set audit manager failed') ?>' + o.msg);
+                }
+            })
+        });
+
+        $('.bind-admin2').click(function (e) {
+            $this = $(this);
+            var url = '<?= Url::to('@web/conf/edit-relation') ?>'
+                + '?id=' + $this.data('id')
+                + '&type=' + $this.data('type');
+            $.get(url , function(o) {
+                if (!o.code) {
+                    location.reload()
+                } else {
+                    alert('<?= yii::t('conf', 'js set audit manager failed') ?>' + o.msg);
+                }
+            })
+        });
+
         // 浮出层
         $('#relation-users .memberdiv').on('mouseenter', function(){
             var $this = $(this);

@@ -13,6 +13,7 @@ return [
 
     'edit' => 'Project Configuration',
     'name' => 'Name:',
+    'ding token' => 'Ding Ding token:',
     'env' => 'Env:',
     'url' => 'Repo Url:',
     'username' => 'Username:',
@@ -95,5 +96,6 @@ return [
     'region empty tips' => 'regionId is empty',
     'load balance id empty tips' => 'LoadBalanceId is empty',
     'get ip empty tips' => 'get ip data is empty! please check config',
-    'test url' => 'project test url:'
+    'test url' => 'project test url:',
+    'manual test weight' => 'manual test slb weight:'
 ];

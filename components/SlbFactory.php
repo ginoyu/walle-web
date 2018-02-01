@@ -36,6 +36,7 @@ class SlbFactory
 //                    $config->accessKeySecret = \yii::$app->params[self::PARAM_ALIYUN][AliyunSlb::KEY_ACCESSKEY_SECRECT];
                     $config->regionId = $params[AliyunSlb::KEY_REGION_ID];
                     $config->loadBanceId = $params[AliyunSlb::KEY_LOAD_BALANCE_ID];
+                    $config->manualWeight=$params['manual_weight'];
                     return $config;
                 }
 
@@ -52,7 +53,7 @@ class SlbFactory
                 {
                     $aliyunConfig = json_decode($project->slb_config);
                     $config = self::getPrivateSlbConfigArray(ISlb::SLB_TYPE_ALIYUN);
-                    $config = array_merge($config, [AliyunSlb::KEY_REGION_ID => $aliyunConfig->regionId, AliyunSlb::KEY_LOAD_BALANCE_ID => $aliyunConfig->loadBanceId]);
+                    $config = array_merge($config, [AliyunSlb::KEY_REGION_ID => $aliyunConfig->regionId, AliyunSlb::KEY_LOAD_BALANCE_ID => $aliyunConfig->loadBanceId, 'manualWeight' => $aliyunConfig->manualWeight]);
                     return $config;
                 }
 
