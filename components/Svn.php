@@ -10,6 +10,7 @@ namespace app\components;
 
 use app\models\Project;
 use app\models\Task as TaskModel;
+use yii\db\Exception;
 use yii\helpers\StringHelper;
 
 class Svn extends Command {
@@ -21,8 +22,9 @@ class Svn extends Command {
      * @param null $svnDir
      * @return bool|int
      */
-    public function updateRepo($branch = 'trunk', $svnDir = null) {
-        $svnDir = $svnDir ?: Project::getDeployFromDir();
+    public function updateRepo($branch = 'trunk', $svnDir = null)
+    {
+        $svnDir = $svnDir ? $svnDir : Project::getDeployFromDir();
         $dotSvn = rtrim($svnDir, '/') . '/.svn';
 
         if (file_exists($dotSvn)) {
@@ -54,6 +56,12 @@ class Svn extends Command {
         // 先更新
         $versionSvnDir = rtrim(Project::getDeployWorkspace($task->link_id), '/');
         $cmd[] = sprintf('cd %s ', $versionSvnDir);
+        $cmd[] = sprintf('rm -rf * ');
+
+
+        $svnUrl = $this->getConfig()->repo_url . '/' . self::getBranchPath($task->branch, $this->getConfig());
+        $cmd[] = $this->_getSvnCmd(sprintf('svn checkout -q %s .', escapeshellarg($svnUrl)));
+
         $cmd[] = $this->_getSvnCmd(sprintf('svn up -q --force -r %d', $task->commit_id));
 
         $command = join(' && ', $cmd);
@@ -123,8 +131,13 @@ class Svn extends Command {
     public function getCommitList($branch = 'trunk', $count = 30) {
         // 先更新
         $destination = Project::getDeployFromDir();
-        $this->updateRepo($branch, $destination);
+        $branchDir = static::getBranchDir($branch, $this->getConfig());
+        if (!file_exists($branchDir)) {
+            $this->updateRepo($branch, $destination);
+        }
         $cmd[] = sprintf('cd %s ', static::getBranchDir($branch, $this->getConfig()));
+
+        $cmd[] = $this->_getSvnCmd('svn update');
         $cmd[] = $this->_getSvnCmd('svn log --xml -l ' . $count);
         $command = join(' && ', $cmd);
         $result = $this->runLocalCommand($command);
@@ -215,11 +228,13 @@ class Svn extends Command {
      */
     public static function formatXmlLog($xmlString) {
         $history = [];
+
         $pos = strpos($xmlString, '<?xml');
         if ($pos > 0) {
             $xmlString = substr($xmlString, $pos);
         }
         $xml = simplexml_load_string($xmlString);
+
         foreach ($xml as $item) {
             $attr = $item->attributes();
             $id   = $attr->__toString();
@@ -255,6 +270,19 @@ class Svn extends Command {
             throw new \InvalidArgumentException('error');
         }
 
+    }
+
+    public static function getBranchPath($branch, Project $project)
+    {
+        if ($branch == 'trunk') {
+            return 'trunk';
+        } elseif ($project->repo_mode == Project::REPO_MODE_BRANCH) {
+            return sprintf('branches/%s', $branch);
+        } elseif ($project->repo_mode == Project::REPO_MODE_TAG) {
+            return sprintf('tags/%s', $branch);
+        } else {
+            throw new \InvalidArgumentException('error');
+        }
     }
 
     /**
