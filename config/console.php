@@ -20,6 +20,17 @@ return [
                 ],
             ],
         ],
+        'mail' => [
+//            'class' => 'yii\swiftmailer\Mailer',
+            'class' =>'app\components\MailerQueue',
+            'db'=>'1',
+            'key'=>'mails',
+            'useFileTransport' => false,
+            'transport' => [
+                'class'      => 'Swift_SmtpTransport',
+            ],
+        ]
     ],
+
     'params'              => array_merge($web['params'], $params),
 ];

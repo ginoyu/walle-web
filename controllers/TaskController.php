@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\components\Command;
 use app\components\PermissionHelper;
 use app\models\User;
 use yii;
@@ -149,8 +150,8 @@ class TaskController extends Controller
                             Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
                                 ->setFrom(Yii::$app->mail->messageConfig['from'])
                                 ->setTo($user->email)
-                                ->setSubject('瓦力平台 - ' . $user->realname)
-                                ->send();
+                                ->setSubject('roobo - ' . $user->realname)
+                                ->queue();
                         }
                     }
 
@@ -265,38 +266,48 @@ class TaskController extends Controller
         $task->save();
 
 
-        // email notify task owner
-        if ($task->status == Task::STATUS_PASS ||
-            $task->status == Task::STATUS_REFUSE ||
-            $task->status == Task::STATUS_TEST_LEADER_FAILED ||
-            $task->status == Task::STATUS_OPS_LEADER_FAILED) {
-            $user = User::findIdentity($task->user_id);
-            Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 0])
-                ->setFrom(Yii::$app->mail->messageConfig['from'])
-                ->setTo($user->email)
-                ->setSubject('瓦力平台 - ' . $user->realname)
-                ->send();
-        } else {
-            $adminType = Group::TYPE_TESTER;
-            if ($status == Task::STATUS_TEC_LEADER_PASS) {
-                $adminType = Group::TYPE_TESTER;
-            } else if ($status == Task::STATUS_TEST_LEADER_PASS) {
-                $adminType = Group::TYPE_OPERATIONS;
-            }
-            $adminIds = Group::getAdminTypeIds($task->project_id, $adminType);
-            if (isset($adminIds) && is_array($adminIds) && count($adminIds) > 0) {
-                $user = User::findIdentity($adminIds[0]);
-                Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
-                    ->setFrom(Yii::$app->mail->messageConfig['from'])
-                    ->setTo($user->email)
-                    ->setSubject('瓦力平台 - ' . $user->realname)
-                    ->send();
-            }
-
-
-        }
+        $this->sendEmail($task);
 
         static::renderJson(['status' => \Yii::t('w', 'task_status_' . $task->status)]);
+    }
+
+    public function sendEmail($task)
+    {
+        try {
+            // email notify task owner
+            if ($task->status == Task::STATUS_PASS ||
+                $task->status == Task::STATUS_REFUSE ||
+                $task->status == Task::STATUS_TEST_LEADER_FAILED ||
+                $task->status == Task::STATUS_OPS_LEADER_FAILED) {
+                $user = User::findIdentity($task->user_id);
+                Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 0])
+                    ->setFrom(Yii::$app->mail->messageConfig['from'])
+                    ->setTo($user->email)
+                    ->setSubject('roobo - ' . $user->realname)
+                    ->queue();
+            } else {
+                $adminType = Group::TYPE_TESTER;
+                if ($task->status == Task::STATUS_TEC_LEADER_PASS) {
+                    $adminType = Group::TYPE_TESTER;
+                } else if ($task->status == Task::STATUS_TEST_LEADER_PASS) {
+                    $adminType = Group::TYPE_OPERATIONS;
+                }
+                $adminIds = Group::getAdminTypeIds($task->project_id, $adminType);
+                if (isset($adminIds) && is_array($adminIds) && count($adminIds) > 0) {
+                    $user = User::findIdentity($adminIds[0]);
+                    Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
+                        ->setFrom(Yii::$app->mail->messageConfig['from'])
+                        ->setTo($user->email)
+                        ->setSubject('roobo - ' . $user->realname)
+                        ->queue();
+                }
+
+            }
+        } catch (\Exception $e) {
+            Command::log('exception happend!' . $e->getTraceAsString());
+            throw $e;
+        }
+
     }
 
 }
