@@ -38,6 +38,7 @@ class AliyunSlb implements ISlb
     const KEY_BACKEND_SERVERS = "BackendServers";
     const KEY_SERVERID = "ServerId";
     const KEY_WEIGHT = "Weight";
+    const KEY_INSTANCES = 'InstanceIds';
 
     // private action
     const ACTION_DESCRIBE_REGIONS = "DescribeRegions";
@@ -71,6 +72,9 @@ class AliyunSlb implements ISlb
     public function getEcsIpList($config = [])
     {
         $data = $this->describeLoadBalancerAttribute($config);
+
+//        Command::log('get ecs ip describeLoadBalancerAttribute:' . $data);
+
         $balanceInfo = json_decode($data);
         $serverIds = [];
         if (isset($balanceInfo) && isset($balanceInfo->BackendServers) && isset($balanceInfo->BackendServers->BackendServer)) {
@@ -81,7 +85,9 @@ class AliyunSlb implements ISlb
         }
 
 
-        $data = $this->getInstances($config);
+        $data = $this->getInstances($config, $serverIds);
+
+//        Command::log('get ecs ip list:' . json_encode($serverIds) . ' ===' . $data);
         $ecsInstance = json_decode($data);
 
         $results = [];
@@ -90,10 +96,10 @@ class AliyunSlb implements ISlb
             foreach ($ecsInstances as $instance) {
                 if (in_array($instance->InstanceId, $serverIds)) {
                     $ip = "";
-                    if (isset($instance->PublicIpAddress) && isset($instance->PublicIpAddress->IpAddress)) {
-                        $ip = $instance->PublicIpAddress->IpAddress[0];
+                    if (isset($instance->NetworkInterfaces) && isset($instance->NetworkInterfaces->NetworkInterface)) {
+                        $ip = $instance->NetworkInterfaces->NetworkInterface[0]->PrimaryIpAddress;
                     } else {
-                        echo $instance->InstanceId . " has not ip params!";
+                        Command::log(InstanceId . " has not ip params!");
                     }
                     array_push($results, [self::PARAM_KEY_SERVER_ID => $instance->InstanceId, self::PARAM_KEY_SERVER_IP => $ip]);
                 }
@@ -104,13 +110,14 @@ class AliyunSlb implements ISlb
 
     }
 
-    public function getInstances($config)
+    public function getInstances($config, $intances = [])
     {
         $this->loadConfig($config);
         $params = [
             self::KEY_ACTION => self::ACTION_DESCRIBE_INSTANCES,
             self::KEY_VERSION => self::CURL_ECS_VERSION,
-            self::KEY_REGION_ID => $this->mRegionId
+            self::KEY_REGION_ID => $this->mRegionId,
+            self::KEY_INSTANCES => json_encode($intances)
         ];
         $data = $this->requestAliSlbService(self::CURL_ECS_URL, $params);
         return $data;

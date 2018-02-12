@@ -17,6 +17,7 @@ class Message extends \yii\swiftmailer\Message
         $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
         if (!$conResult) {
             Command::log('redis connect error!');
+            throw new \yii\base\InvalidConfigException('redis connect error!.');
         }
         if (empty($redis)) {
             throw new \yii\base\InvalidConfigException('redis not found in config.');
