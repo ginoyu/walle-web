@@ -36,7 +36,7 @@ return [
     'deploy from tip' => '代码的检出存放路径',
     'excludes tip' => '剔除不上线的文件、目录，每行一个',
     'target user tip' => '代码的部署的用户，一般是运行的服务的用户，如php进程用户www',
-    'webroot tip' => '代码的最终部署路径，请不要在目标机新建此目录，walle会自动生成此软链，正确设置父目级录即可',
+    'webroot tip' => '代码的最终部署路径，请不要在目标机新建此目录，walle会自动生成此软链，正确设置父级目录即可',
     'releases tip' => '代码发布的版本库，每次发布更新webroot的软链到当前最新版本',
     'keep version tip' => '过多的历史版本将被删除，只可回滚保留的版本',
     'servers tip' => '要发布的机器列表，一行一个，非22端口可 ip:port',

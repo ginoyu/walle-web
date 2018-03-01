@@ -8,7 +8,7 @@
 
 namespace app\components;
 
-define('DINGDING_BOT_ACCESSTOKEN', '8190eb49d1ea701f5c0a92a919279398a2a4ac3c984278f5c8ebbc8ab81f2bbf');
+define('DINGDING_BOT_ACCESSTOKEN', '1b0e5803d597d0a35018f6faf9b246b0a43361606a22071526eb6153bc7bcd3f');
 
 class DingDingBot
 {
