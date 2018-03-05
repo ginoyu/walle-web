@@ -204,7 +204,13 @@ class Command
 
         $logFile = realpath($logDir) . '/walle-' . date('Ymd') . '.log';
         if (self::$logFile === null) {
-            self::$logFile = fopen($logFile, 'a');
+            self::$logFile = fopen($logFile, 'a+');
+            try {
+                if (file_exists($logFile)) {
+                    chmod($logFile, 0666);
+                }
+            } catch (\Exception $e) {
+            }
         }
 
         $message = date('Y-m-d H:i:s -- ') . $message;
