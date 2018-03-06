@@ -700,6 +700,7 @@ class WalleController extends Controller
                     $errorCommand = 'project conf error manual weight should not be 0';
                     $errMsg = yii::t('walle', 'manual weight error');
                     $executeResult = false;
+                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
                     break;
                 }
 
