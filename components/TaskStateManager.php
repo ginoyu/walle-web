@@ -87,12 +87,15 @@ class TaskStateManager
         $status = $this->getStatus($taskId, $host);
         switch ($status) {
             case self::STATE_UPDATING_SERVER:
+            case self::STATE_UPDATE_SERVER_FAILED:
                 $progress = 0;
                 break;
             case self::STATE_DOING_AUTO_TEST:
+            case self::STATE_DO_AUTO_TEST_FAILED:
                 $progress = 33;
                 break;
             case self::STATE_DOING_MANUAL_TEST:
+            case self::STATE_DOING_MANUAL_TEST_FAILED:
                 $progress = 66;
                 break;
             case self::STATE_ONLINE_SUCCESS:

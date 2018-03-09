@@ -87,9 +87,9 @@ $isRunning = $taskManger->isRunningTask($task->id);
             <?php foreach ($hosts as $host) { ?>
                 <?= $host ?>
                 <div class="status">
-                    <span style="width: 30%"><i class="fa fa-circle-o text-yellow step-1"></i><?= yii::t('walle', 'sub status 1') ?></span>
-                    <span style="width: 30%"><i class="fa fa-circle-o text-yellow step-2"></i><?= yii::t('walle', 'sub status 2') ?></span>
-                    <span style="width: 30%"><i class="fa fa-circle-o text-yellow step-3"></i><?= yii::t('walle', 'sub status 3') ?></span>
+                    <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-1"></i><?= yii::t('walle', 'sub status 1') ?></span>
+                    <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-2"></i><?= yii::t('walle', 'sub status 2') ?></span>
+                    <span style="width: 28%"><i class="fa fa-circle-o text-yellow step-3"></i><?= yii::t('walle', 'sub status 3') ?></span>
                 </div>
                 <div id="btn_container_<?= str_replace('.','',$host) ?>"
                      style="display: <?= $taskManger->getStatus($task->id, $host) == \app\components\TaskStateManager::STATE_DOING_MANUAL_TEST ? '' : 'none' ?>">
@@ -104,7 +104,7 @@ $isRunning = $taskManger->isRunningTask($task->id);
                     </button>
                 </div>
                 <div style="clear:both"></div>
-                <div class="progress progress-mini progress-striped active" style="width: 90%">
+                <div class="progress progress-mini progress-striped active" style="width: 84%">
                     <div class="progress-bar progress-bar-success" id="progress_<?= str_replace('.','',$host) ?>"
                          style="width: 0%;"></div>
                 </div>
@@ -237,6 +237,7 @@ $isRunning = $taskManger->isRunningTask($task->id);
                     $('.progress-status').removeClass('progress-bar-striped').addClass('progress-bar-success');
                     $('.progress-status').parent().removeClass('progress-striped');
                     $('.result-success').show();
+                    $('#skip_manual_test').attr('disabled', true);
                 } else {
                     setTimeout(getProcess, 600);
                 }

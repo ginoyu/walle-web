@@ -697,7 +697,7 @@ class WalleController extends Controller
                 $manualWeight = $slbConfig['manualWeight'];
                 if ($manualWeight <= 0) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
-                    $errorCommand = 'project conf error manual weight should not be 0';
+                    $errorCommand = 'project conf error manual weight should not be '.$manualWeight;
                     $errMsg = yii::t('walle', 'manual weight error');
                     $executeResult = false;
                     $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
