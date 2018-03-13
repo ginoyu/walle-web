@@ -84,11 +84,12 @@ class WalleController extends Controller
         $taskStateManager = new TaskStateManager();
         $taskStateManager->setRunningTask($taskId);
 
-
         // 项目配置
         $this->conf = Project::getConf($this->task->project_id);
         $this->walleTask = new WalleTask($this->conf);
         $this->walleFolder = new Folder($this->conf);
+
+        $this->clearSubTaskStatus();
         try {
             if ($this->task->action == TaskModel::ACTION_ONLINE) {
                 $this->_makeVersion();
@@ -126,7 +127,7 @@ class WalleController extends Controller
             $this->conf->save();
 
             $dingding = new DingDingBot($this->conf->ding_token);
-            $dingding->sendToAll('上线单:'.$this->task->title.'  '.'上线成功');
+            $dingding->sendToAll('上线单:' . $this->task->title . '  ' . '上线成功');
 
         } catch (\Exception $e) {
             Command::log('exception happend!' . $e->getTraceAsString());
@@ -138,7 +139,7 @@ class WalleController extends Controller
             $taskStateManager->clearRunningTaskState($taskId);
 
             $dingding = new DingDingBot($this->conf->ding_token);
-            $dingding->sendToAll('上线单:'.$this->task->title.'  '.'上线失败');
+            $dingding->sendToAll('上线单:' . $this->task->title . '  ' . '上线失败');
             throw $e;
         }
         $taskStateManager->clearRunningTaskState($taskId);
@@ -697,7 +698,7 @@ class WalleController extends Controller
                 $manualWeight = $slbConfig['manualWeight'];
                 if ($manualWeight <= 0) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
-                    $errorCommand = "project conf error manual weight should not be ".strval($manualWeight);
+                    $errorCommand = "project conf error manual weight should not be " . strval($manualWeight);
                     $errMsg = yii::t('walle', 'manual weight error');
                     $executeResult = false;
                     $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
@@ -757,6 +758,15 @@ class WalleController extends Controller
         return true;
     }
 
+    private function clearSubTaskStatus()
+    {
+        $hosts = GlobalHelper::str2arr($this->conf->hosts);
+        $statusManager = new TaskStateManager();
+        foreach ($hosts as $host) {
+            $statusManager->clearStatus($this->task->id, $host);
+        }
+    }
+
     private function dealSlbError($command, $duration)
     {
         // rollback version
@@ -793,7 +803,7 @@ class WalleController extends Controller
             curl_setopt($curl, CURLOPT_URL, $url . "/?" . http_build_query($params));
             $data = curl_exec($curl);
             curl_close($curl);
-            $testResult= json_decode($data);
+            $testResult = json_decode($data);
             if (!isset($testResult) || !isset($testResult->id) || $testResult->id <= 0) {
                 Command::log('call test service failed');
                 return false;
