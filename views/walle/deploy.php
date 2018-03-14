@@ -227,6 +227,7 @@ $isRunning = $taskManger->isRunningTask($task->id);
                     $('.result-failed').show();
                     // $('.btn-deploy').removeClass('disabled');
                     $('.btn-deploy').attr('disabled', false);
+                    $('#skip_manual_test').attr('disabled', true);
                     return;
                 } else {
                     $('.progress-status')
@@ -282,6 +283,7 @@ $isRunning = $taskManger->isRunningTask($task->id);
             $('.progress-status').attr('aria-valuenow', 10).width('10%');
             $('.result-failed').hide();
             $('#skip_manual_test').show();
+            $('#skip_manual_test').attr('disabled', false);
 
             setTimeout(getProcess, 600);
             setTimeout(updateSubProgress, 1000);
