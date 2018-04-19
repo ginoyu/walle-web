@@ -3,7 +3,11 @@
  * @var yii\web\View $this
  */
 $this->title = yii::t('conf', 'index');
+
+use yii\bootstrap\Modal;
+use yii\helpers\Html;
 use yii\helpers\Url;
+
 ?>
 <div class="box">
     <div class="page-header">
@@ -11,7 +15,8 @@ use yii\helpers\Url;
             <input type="hidden" value="<?= \Yii::$app->request->getCsrfToken(); ?>" name="_csrf">
             <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;">
                 <div class="input-group">
-                    <input type="text" name="kw" class="form-control search-query" placeholder="<?= yii::t('conf', 'index search placeholder') ?>">
+                    <input type="text" name="kw" class="form-control search-query"
+                           placeholder="<?= yii::t('conf', 'index search placeholder') ?>">
                     <span class="input-group-btn">
                         <button type="submit"
                                 class="btn btn-default btn-sm">
@@ -29,7 +34,8 @@ use yii\helpers\Url;
     </div><!-- /.box-header -->
     <div class="box-body table-responsive no-padding clearfix">
         <table class="table table-striped table-bordered table-hover">
-            <tbody><tr>
+            <tbody>
+            <tr>
                 <th><?= yii::t('conf', 'p_name') ?></th>
                 <th><?= yii::t('conf', 'p_env') ?></th>
                 <th><?= yii::t('conf', 'p_mode') ?></th>
@@ -46,11 +52,13 @@ use yii\helpers\Url;
                     <td><?= \Yii::t('w', 'conf_status_' . $item['status']) ?></td>
                     <td class="<?= \Yii::t('w', 'conf_status_' . $item['status'] . '_color') ?>">
                         <div class="action-buttons">
-                            <a href="<?= Url::to("@web/conf/preview/?projectId={$item['id']}") ?>" data-toggle="modal" class="viewmodal_hook" data-target="#viewModal">
+                            <a href="<?= Url::to("@web/conf/preview/?projectId={$item['id']}") ?>" data-toggle="modal"
+                               class="viewmodal_hook" data-target="#viewModal">
                                 <i class="icon-zoom-in bigger-130"></i>
                                 <?= yii::t('conf', 'p_preview') ?>
                             </a>
-                            <a href="<?= Url::to("@web/conf/detection/?projectId={$item['id']}") ?>" data-toggle="modal" class="viewmodal_hook"  data-target="#viewModal">
+                            <a href="<?= Url::to("@web/conf/detection/?projectId={$item['id']}") ?>" data-toggle="modal"
+                               class="viewmodal_hook" data-target="#viewModal">
                                 <i class="icon-screenshot bigger-130"></i>
                                 <?= yii::t('conf', 'p_detection') ?>
                             </a>
@@ -73,27 +81,29 @@ use yii\helpers\Url;
                         </div>
                     </td>
                 </tr>
-                <?php } ?>
+            <?php } ?>
             </tbody>
         </table>
 
         <!-- 模态框（Modal） -->
-        <div class="modal fade" id="viewModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
-			<div class="modal-dialog">
-				<div class="modal-content">
-				</div><!-- /.modal-content -->
-			</div><!-- /.modal -->
-		</div>
+        <div class="modal fade" id="viewModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                </div><!-- /.modal-content -->
+            </div><!-- /.modal -->
+        </div>
 
-    </div><!-- /.box-body -->
+
+    </div>
 </div>
-
 <script>
-    jQuery(function($) {
-        $('.btn-delete').click(function(e) {
+
+    jQuery(function ($) {
+        $('.btn-delete').click(function (e) {
             $this = $(this);
             if (confirm('<?= yii::t('conf', 'js delete project') ?>')) {
-                $.get('<?= Url::to('@web/conf/delete') ?>', {projectId: $this.data('id')}, function(o) {
+                $.get('<?= Url::to('@web/conf/delete') ?>', {projectId: $this.data('id')}, function (o) {
                     if (!o.code) {
                         $this.closest("tr").remove();
                     } else {
@@ -102,10 +112,10 @@ use yii\helpers\Url;
                 })
             }
         })
-        $('.btn-copy').click(function(e) {
+        $('.btn-copy').click(function (e) {
             $this = $(this);
             if (confirm('<?= yii::t('conf', 'js copy project confirm') ?>')) {
-                $.get('<?= Url::to('@web/conf/copy') ?>', {projectId: $this.data('id')}, function(o) {
+                $.get('<?= Url::to('@web/conf/copy') ?>', {projectId: $this.data('id')}, function (o) {
                     if (!o.code) {
                         location.reload();
                     } else {
@@ -114,9 +124,9 @@ use yii\helpers\Url;
                 })
             }
         })
-        $("#viewModal").on("hidden.bs.modal", function() {
+        $("#viewModal").on("hidden.bs.modal", function () {
             $(this).removeData("bs.modal");
         });
-       
+
     });
 </script>

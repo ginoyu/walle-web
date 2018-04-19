@@ -96,10 +96,13 @@ class AliyunSlb implements ISlb
             foreach ($ecsInstances as $instance) {
                 if (in_array($instance->InstanceId, $serverIds)) {
                     $ip = "";
+
                     if (isset($instance->NetworkInterfaces) && isset($instance->NetworkInterfaces->NetworkInterface)) {
                         $ip = $instance->NetworkInterfaces->NetworkInterface[0]->PrimaryIpAddress;
+                    } else if (isset($instance->InnerIpAddress->IpAddress)) {
+                        $ip = $instance->InnerIpAddress->IpAddress[0];
                     } else {
-                        Command::log(InstanceId . " has not ip params!");
+                        Command::log($instance->InstanceId . " has not ip params!");
                     }
                     array_push($results, [self::PARAM_KEY_SERVER_ID => $instance->InstanceId, self::PARAM_KEY_SERVER_IP => $ip]);
                 }
@@ -162,7 +165,7 @@ class AliyunSlb implements ISlb
             return false;
         }
 
-        Command::log('changed serverId:' . $serverId);
+//        Command::log('changed serverId:' . $serverId);
 
         // get origin weight
         $loadBancerResult = $this->describeLoadBalancerAttribute($config);
@@ -187,7 +190,6 @@ class AliyunSlb implements ISlb
         ];
         $data = $this->requestAliSlbService(self::CURL_SLB_URL, $params);
 
-
         $resultObj = json_decode($data);
 
         $success = false;
@@ -202,7 +204,7 @@ class AliyunSlb implements ISlb
                 }
             }
         }
-        Command::log('setBackendServerWeightWithIp ip:' . $ip . ' result:' . $data . ' success:' . ($success ? 'true' : 'false') . ' originWeight:' . $originWeight);
+//        Command::log('setBackendServerWeightWithIp ip:' . $ip . ' result:' . $data . ' success:' . ($success ? 'true' : 'false') . ' originWeight:' . $originWeight);
 
         return ['success' => $success, 'originWeight' => $originWeight];
     }
@@ -310,5 +312,54 @@ class AliyunSlb implements ISlb
         $str = str_replace('*', '%2A', $str);
         $str = str_replace('%7E', '~', $str);
         return $str;
+    }
+
+    /**
+     * get weight by ips
+     * @param array $config
+     * @param array $ips
+     * @return mixed
+     */
+    public function getWeightByIps($config = [], $ips = [])
+    {
+        $data = $this->describeLoadBalancerAttribute($config);
+
+//        Command::log('get ecs ip describeLoadBalancerAttribute:' . $data);
+
+        $balanceInfo = json_decode($data);
+        $serverIds = [];
+
+        if (isset($balanceInfo) && isset($balanceInfo->BackendServers) && isset($balanceInfo->BackendServers->BackendServer)) {
+            $backendServer = $balanceInfo->BackendServers->BackendServer;
+            foreach ($backendServer as $server) {
+                $serverIds[$server->ServerId] = $server->Weight;
+            }
+        }
+
+        $data = $this->getInstances($config, array_keys($serverIds));
+
+//        Command::log('get ecs ip list:' . json_encode($serverIds) . ' ===' . $data);
+        $ecsInstance = json_decode($data);
+
+        $results = [];
+        if (isset($ecsInstance) && isset($ecsInstance->Instances) && isset($ecsInstance->Instances->Instance)) {
+            $ecsInstances = $ecsInstance->Instances->Instance;
+            foreach ($ecsInstances as $instance) {
+                if (key_exists($instance->InstanceId, $serverIds)) {
+                    $ip = "";
+
+                    if (isset($instance->NetworkInterfaces) && isset($instance->NetworkInterfaces->NetworkInterface)) {
+                        $ip = $instance->NetworkInterfaces->NetworkInterface[0]->PrimaryIpAddress;
+                    } else if (isset($instance->InnerIpAddress->IpAddress)) {
+                        $ip = $instance->InnerIpAddress->IpAddress[0];
+                    } else {
+                        Command::log($instance->InstanceId . " has not ip params!");
+                    }
+                    $results[$ip] = $serverIds[$instance->InstanceId];
+                }
+            }
+        }
+
+        return $results;
     }
 }

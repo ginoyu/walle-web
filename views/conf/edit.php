@@ -244,15 +244,6 @@ $slb_confg = json_decode($conf->slb_config);
                               </label>
                           </div>
 
-                          <div>
-                              <label class="text-left bolder blue">
-                                  <?= yii::t('conf', 'manual test weight') ?>
-                                  <input style="margin-top: 10px; width: 300px" name="manual_weight" type="text"
-                                         data-rel="tooltip" data-placement="top"
-                                         value="<?= isset($slb_confg) && isset($slb_confg->manualWeight) ? $slb_confg->manualWeight : "" ?>">
-                              </label>
-                          </div>
-
                           <input id="get-ip-button" type="button" class="btn btn-sm btn-info no-radius" value="获取机器列表"
                                  style="margin-bottom: 10px"/>
                       </div>

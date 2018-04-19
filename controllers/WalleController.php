@@ -9,6 +9,7 @@
 
 namespace app\controllers;
 
+use app\components\AlertUtils;
 use app\components\Ansible;
 use app\components\Command;
 use app\components\Controller;
@@ -24,6 +25,7 @@ use app\models\Project;
 use app\models\Group;
 use app\models\Record;
 use app\models\Task as TaskModel;
+use app\models\User;
 use yii;
 
 class WalleController extends Controller
@@ -90,6 +92,10 @@ class WalleController extends Controller
         $this->walleFolder = new Folder($this->conf);
 
         $this->clearSubTaskStatus();
+
+        $dingding = new DingDingBot($this->conf->ding_token);
+
+        $dingding->sendToAll(AlertUtils::getOnlineStart($this->task));
         try {
             if ($this->task->action == TaskModel::ACTION_ONLINE) {
                 $this->_makeVersion();
@@ -126,8 +132,7 @@ class WalleController extends Controller
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
 
-            $dingding = new DingDingBot($this->conf->ding_token);
-            $dingding->sendToAll('上线单:' . $this->task->title . '  ' . '上线成功');
+            $dingding->sendToAll(AlertUtils::getOnlineSuccess($this->task));
 
         } catch (\Exception $e) {
             Command::log('exception happend!' . $e->getTraceAsString());
@@ -138,9 +143,7 @@ class WalleController extends Controller
 
             $taskStateManager->clearRunningTaskState($taskId);
 
-            $dingding = new DingDingBot($this->conf->ding_token);
-            $dingding->sendToAll('上线单:' . $this->task->title . '  ' . '上线失败');
-            throw $e;
+            $dingding->sendToAll(AlertUtils::getOnlineFailed($this->task));
         }
         $taskStateManager->clearRunningTaskState($taskId);
         $this->renderJson([]);
@@ -378,8 +381,15 @@ class WalleController extends Controller
             throw new \Exception(yii::t('w', 'you are not master of project'));
         }
 
+        $this->conf = $this->task->project;
+        $slb = SlbFactory::getSlb($this->conf->slb_type);
+        $slbConfig = SlbFactory::getSlbConfig($this->conf);
+
+        $weights = $slb->getWeightByIps($slbConfig);
+
         return $this->render('deploy', [
             'task' => $this->task,
+            'weight' => $weights
         ]);
     }
 
@@ -390,16 +400,45 @@ class WalleController extends Controller
      */
     public function actionGetProcess($taskId)
     {
-        $record = Record::find()
-            ->select(['percent' => 'action', 'status', 'memo', 'command'])
-            ->where(['task_id' => $taskId,])
-            ->orderBy('id desc')
-            ->asArray()
-            ->one();
-        $record['memo'] = stripslashes($record['memo']);
-        $record['command'] = stripslashes($record['command']);
+        try {
+            $record = Record::find()
+                ->select(['percent' => 'action', 'status', 'memo', 'command'])
+                ->where(['task_id' => $taskId,])
+                ->orderBy('id desc')
+                ->asArray()
+                ->one();
+            $record['memo'] = stripslashes($record['memo']);
+            $record['command'] = stripslashes($record['command']);
 
-        $this->renderJson($record);
+            // sub task status
+            $this->task = TaskModel::findOne($taskId);
+            $this->conf = Project::getConf($this->task->project_id);
+            $slb = SlbFactory::getSlb($this->conf->slb_type);
+            $slbConfig = SlbFactory::getSlbConfig($this->conf);
+
+            $hosts = $this->conf->hosts;
+
+            $host_array = \app\components\GlobalHelper::str2arr($hosts);
+
+            $taskStateManager = new TaskStateManager();
+            $weights = $slb->getWeightByIps($slbConfig);
+            $resultArray = [];
+            foreach ($host_array as $host) {
+                $resultArray[] = array(
+                    'host' => $host,
+                    'status' => $taskStateManager->getStatus($taskId, $host),
+                    'progress' => $taskStateManager->getProgress($taskId, $host),
+                    'weight' => isset($weights[$host]) ? $weights[$host] : -1
+                );
+            }
+
+            $record['subTaskStatus'] = $resultArray;
+
+            $this->renderJson($record);
+        } catch (\Exception $e) {
+            Command::log('actionGetProcess exception happend!' . $e->getTraceAsString());
+            $this->renderJson(array('subTaskStatus' => []));
+        }
     }
 
     /**
@@ -408,19 +447,27 @@ class WalleController extends Controller
      * @param $taskId
      * @param $hosts
      */
-    public function actionGetTaskProcess($taskId, $hosts)
+    public function actionGetTaskProcess($taskId)
     {
+        $this->task = TaskModel::findOne($taskId);
+        $this->conf = Project::getConf($this->task->project_id);
+        $slb = SlbFactory::getSlb($this->conf->slb_type);
+        $slbConfig = SlbFactory::getSlbConfig($this->conf);
+
+        $hosts = $this->conf->hosts;
+
         $host_array = \app\components\GlobalHelper::str2arr($hosts);
 
         $taskStateManager = new TaskStateManager();
-
+        $weights = $slb->getWeightByIps($slbConfig);
         $resultArray = [];
         foreach ($host_array as $host) {
-            $result = (object)array();
-            $result->host = $host;
-            $result->status = $taskStateManager->getStatus($taskId, $host);
-            $result->progress = $taskStateManager->getProgress($taskId, $host);
-            $resultArray[] = $result;
+            $resultArray[] = array(
+                'host' => $host,
+                'status' => $taskStateManager->getStatus($taskId, $host),
+                'progress' => $taskStateManager->getProgress($taskId, $host),
+                'weight' => isset($weights[$host]) ? $weights[$host] : -1
+            );
         }
 
         $this->renderJson($resultArray);
@@ -468,6 +515,40 @@ class WalleController extends Controller
         $this->renderJson($params, $code, $msg);
     }
 
+    public function actionPreview($host, $taskId)
+    {
+        $this->layout = 'new_modal';
+        return $this->render('manual_pass', [
+            'host' => $host,
+            'taskId' => $taskId
+        ]);
+    }
+
+    public function actionWeight($host, $taskId)
+    {
+        $this->layout = 'new_modal';
+        return $this->render('weight', [
+            'host' => $host,
+            'taskId' => $taskId
+        ]);
+    }
+
+    public function actionChangeWeight($host, $taskId, $weight)
+    {
+        Command::log('weight:' . $weight);
+        $this->task = TaskModel::findOne($taskId);
+        $this->conf = Project::getConf($this->task->project_id);
+        $slb = SlbFactory::getSlb($this->conf->slb_type);
+        $slbConfig = SlbFactory::getSlbConfig($this->conf);
+
+        $result = $slb->setBackendServerWeight($slbConfig, $host, $weight);
+
+        if (!$result) {
+            return self::renderJson($result, self::FAIL, 'setBackendServerWeight failed');
+        }
+        self::renderJson($result);
+    }
+
     /**
      * 产生一个上线版本
      */
@@ -492,12 +573,16 @@ class WalleController extends Controller
         // 本地宿主机工作区初始化
         $this->walleFolder->initLocalWorkspace($this->task);
 
+        Command::log('_initWorkspace local success');
         // 远程目标目录检查，并且生成版本目录
         $ret = $this->walleFolder->initRemoteVersion($this->task->link_id);
+
+        Command::log('_initWorkspace remote execute success');
         // 记录执行时间
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleFolder, $this->task->id, Record::ACTION_PERMSSION, $duration);
 
+        Command::log('_initWorkspace save remote record success');
         if (!$ret) {
             throw new \Exception(yii::t('walle', 'init deployment workspace error'));
         }
@@ -649,6 +734,7 @@ class WalleController extends Controller
             $errorCommand = '';
             $slbConfig = SlbFactory::getSlbConfig($this->conf);
             $statusManager = new TaskStateManager();
+            $user = User::findIdentity($this->task->user_id);
             foreach ($hosts as $host) {
                 $statusManager->clearStatus($this->task->id, $host);
 
@@ -669,7 +755,8 @@ class WalleController extends Controller
                 // slb switch
                 $switchRet1 = $slb->setBackendServerWeight($slbConfig, $host, 0);
 
-                $originWeight = $switchRet1['originWeight'];
+//                $originWeight = $switchRet1['originWeight'];
+                $originWeight = 100;
 
                 if (!$switchRet1) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DO_AUTO_TEST_FAILED);
@@ -691,35 +778,17 @@ class WalleController extends Controller
                     break;
                 }
 
+                // notify auto test result
+                $dingding = new DingDingBot($this->conf->ding_token);
+                $dingding->sendToAll(AlertUtils::getAutoTestResult($this->task, $host));
+
                 Command::log('step3 remote server:' . $host . ' test success');
 
                 // manual test
                 $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST);
-                $manualWeight = $slbConfig['manualWeight'];
-                if ($manualWeight <= 0) {
-                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
-                    $errorCommand = "project conf error manual weight should not be " . strval($manualWeight);
-                    $errMsg = yii::t('walle', 'manual weight error');
-                    $executeResult = false;
-                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
-                    break;
-                }
 
-                Command::log('step4 remote server:' . $host . ' update manual doing success');
-                // manual test switch slb
-                $switchRet = $slb->setBackendServerWeight($slbConfig, $host, $manualWeight);
-
-                if (!$switchRet) {
-                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
-                    $errorCommand = 'switch manual slb host:' . $host . ' failed';
-                    $errMsg = yii::t('walle', 'slb switch error');
-                    $executeResult = false;
-                    break;
-                }
-
-                Command::log('step5 remote server:' . $host . ' update manual switch slb success');
-                $manualTestRet = $this->waitManualTestResult($host);
-                if (!$manualTestRet) {
+                $manualTestRet = $this->waitManualTestResult($host, $originWeight);
+                if (!$manualTestRet || strcmp($manualTestRet['success'], 'false') == 0) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
                     $errorCommand = 'manual test:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'manual test error');
@@ -728,9 +797,19 @@ class WalleController extends Controller
                     break;
                 }
 
-                Command::log('step6 remote server:' . $host . ' update manual test success');
+                // notify manual test result
+                $dingding = new DingDingBot($this->conf->ding_token);
+                $dingding->sendToAll(AlertUtils::getMaunalTestResult($this->task, $host, $user->username));
+
+                Command::log('step4 remote server:' . $host . ' update manual test success');
+
+                $weight = $originWeight;
+                if (isset($manualTestRet['weight']) && $manualTestRet['weight'] >= 0) {
+                    $weight = $manualTestRet['weight'];
+                }
+
                 //slb switch
-                $switchRet = $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
+                $switchRet = $slb->setBackendServerWeight($slbConfig, $host, $weight);
                 if (!$switchRet) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_MANUAL_TEST_FAILED);
                     $errorCommand = 'final switch slb host:' . $host . ' failed';
@@ -740,7 +819,7 @@ class WalleController extends Controller
                 }
 
                 $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_ONLINE_SUCCESS);
-                Command::log('step7 remote server:' . $host . ' switch origin ' . $originWeight . 'slb success');
+                Command::log('step5 remote server:' . $host . ' switch origin ' . $originWeight . 'slb success');
             }
 
             if (!$executeResult) {
@@ -855,7 +934,7 @@ class WalleController extends Controller
 
     }
 
-    private function waitManualTestResult($host)
+    private function waitManualTestResult($host, $originWeight)
     {
 
         $redis = new \Redis();
@@ -897,6 +976,61 @@ class WalleController extends Controller
             $waitTime += 1;
         }
 
+        // delete redis key
+        $redis->delete($randomKey);
+
+        // close
+        $redis->close();
+
+        $result = json_decode($resultJson, true);
+
+        if ($skipManualTest) {
+            $result['weight'] = $originWeight;
+            $result['success'] = true;
+        }
+
+        return $result;
+    }
+
+    private function dealMinFlowTest($host)
+    {
+        $redis = new \Redis();
+        $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
+        if (!$conResult) {
+            Command::log('dealMinFlowTest redis connect error');
+            return false;
+        }
+        $taskId = $this->task->id;
+
+        $randomKey = TaskStateManager::getMinFlowTestResultKey($taskId, $host);
+
+        $waitTime = 0;
+        $maxWaitTime = \Yii::$app->params['minflow.timeout'];
+        $resultJson = false;
+        $skipManualTestKey = TaskStateManager::getTaskManualTestAllPassKey($taskId);
+        while (true) {
+            if ($waitTime >= $maxWaitTime) {
+                Command::log('wait min flow result timeout!');
+                break;
+            }
+
+            if ($redis->exists($skipManualTestKey)) {
+                $skipManualTest = $redis->get($skipManualTestKey) > 0;
+                if ($skipManualTest) {
+                    Command::log('dealMinFlowTest skip manual test!');
+                    break;
+                }
+            }
+
+            sleep(1);
+            if ($redis->exists($randomKey)) {
+                $resultJson = $redis->get($randomKey);
+                Command::log('dealMinFlowTest get value:' . $resultJson);
+                break;
+            }
+            $waitTime += 1;
+        }
+
 
         // delete redis key
         $redis->delete($randomKey);
@@ -904,9 +1038,12 @@ class WalleController extends Controller
         // close
         $redis->close();
 
-        $result = json_decode($resultJson);
-
-        return isset($result) && isset($result->success) && strcmp('true', $result->success) == 0 || $skipManualTest;
+        if (!$resultJson || empty($resultJson)) {
+            return false;
+        } else {
+            $result = json_decode($resultJson);
+            return $result;
+        }
     }
 
     /**

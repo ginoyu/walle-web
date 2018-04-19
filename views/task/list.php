@@ -124,6 +124,14 @@ use yii\helpers\Url;
                                         <?= yii::t('task', 'delete') ?>
                                     </a>
                                 <?php } ?>
+                                <?php if ($item['project']['slb_status'] && $item['status'] == Task::STATUS_DONE && false) { ?>
+                                    <a href="<?= Url::to("@web/walle/deploy?taskId={$item['id']}") ?>"
+                                       class="green">
+                                        <i class="icon-cloud-upload text-success bigger-130"
+                                           data-id="<?= $item['id'] ?>"></i>
+                                        流量
+                                    </a>
+                                <?php } ?>
                             <?php } ?>
                         </div>
                     </td>

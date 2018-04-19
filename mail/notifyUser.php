@@ -15,10 +15,11 @@ $confirmationLink = Yii::$app->urlManager->createAbsoluteUrl(['task/index']);
 
 <br><br>
 <?php if (!$notify_admin) { ?>
-    <span style="text-indent: 2em"><?= yii::t('task', 'task tips') ?><?= $task->title ?>
+    <span style="text-indent: 2em"><?= yii::t('task', 'task tips') ?><?= $task->commit_id ?>
+        &nbsp;&nbsp;&nbsp;<?= $task->title ?>
         &nbsp;&nbsp;&nbsp;<?= yii::t('task', 'task_notify_' . $task->status) ?></span>
 <?php } else { ?>
-    <span style="text-indent: 2em"><?= yii::t('task', 'task tips') . $task->title ?>&nbsp;&nbsp;&nbsp;
+    <span style="text-indent: 2em"><?= yii::t('task', 'task tips') . $task->commit_id . ' ' . $task->title ?>&nbsp;&nbsp;&nbsp;
         <?= yii::t('task', 'task audit tips') ?></span>
 <?php } ?>
 

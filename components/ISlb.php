@@ -23,4 +23,12 @@ interface ISlb
      * set backend server weight
      **/
     public function setBackendServerWeight($config = [], $ip, $weight);
+
+    /**
+     * get weight by ips
+     * @param array $config
+     * @param array $ips
+     * @return mixed
+     */
+    public function getWeightByIps($config = [], $ips = []);
 }

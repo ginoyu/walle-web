@@ -50,6 +50,6 @@ return [
     'task_notify_8'=>'被运维管理员审核拒绝',
     'task_notify_1'=>'审核通过,可以上线啦',
     'check out'=>'点击查看',
-    'task tips'=>'上线单:',
+    'task tips'=>'上线单：',
     'task audit tips'=>'需要你审核，请点击查看吧',
 ];

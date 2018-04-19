@@ -39,20 +39,15 @@ return [
         ],
         'ssl'            => false,
     ],
-    'slb'                               => [
-        'accessKey'      => '',
-        'accessSecret'   => '',
-        'address'        => 'https://slb.aliyuncs.com',
-        'machines'       => [
-            'machine'   => 'machineId'
-        ],
-        'slbs'           => [
-            [
-                "key" => "slbId",
-                "servers" => [
-                    "machine"
-                ]
-            ],
-        ]
-    ]
+    'aliyun_slb'                               => [
+        'AccessKeyId'      => '',
+        'AccessKeySecret'   => '',
+    ],
+    'redis' => [
+        'url' => '127.0.0.1',
+        'port' => '6379'
+    ],
+    'manual.timeout' => 900,
+    'auto.timeout' => 900,
+    'check_machine' => true
 ];

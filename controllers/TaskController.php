@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\components\AlertUtils;
 use app\components\Command;
 use app\components\PermissionHelper;
 use app\models\User;
@@ -283,7 +284,7 @@ class TaskController extends Controller
                 Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 0])
                     ->setFrom(Yii::$app->mail->messageConfig['from'])
                     ->setTo($user->email)
-                    ->setSubject('roobo - ' . $user->realname)
+                    ->setSubject(AlertUtils::getAuditSubject($task))
                     ->queue();
             } else {
                 $adminType = Group::TYPE_TESTER;
@@ -298,7 +299,7 @@ class TaskController extends Controller
                     Yii::$app->mail->compose('notifyUser', ['user' => $user, 'task' => $task, 'notify_admin' => 1])
                         ->setFrom(Yii::$app->mail->messageConfig['from'])
                         ->setTo($user->email)
-                        ->setSubject('roobo - ' . $user->realname)
+                        ->setSubject(AlertUtils::getAuditSubject($task))
                         ->queue();
                 }
 

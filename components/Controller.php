@@ -52,7 +52,7 @@ class Controller extends yii\web\Controller {
             'code' => (int)$code,
             'msg'  => $msg,
             'data' => $data,
-        ];;
+        ];
         Yii::$app->end();
     }
 

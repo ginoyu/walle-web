@@ -13,5 +13,4 @@ class AliyunSlbConfig extends SlbConfig
 {
     public $regionId;
     public $loadBanceId;
-    public $manualWeight;
 }

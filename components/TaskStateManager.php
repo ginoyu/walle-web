@@ -210,5 +210,10 @@ class TaskStateManager
         return md5($taskId . $host . 'manual_test_result');
     }
 
+    public static function getMinFlowTestResultKey($taskId, $host)
+    {
+        return md5($taskId . $host . 'min_flow_test');
+    }
+
 
 }
