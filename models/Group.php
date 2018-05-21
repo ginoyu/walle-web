@@ -117,14 +117,17 @@ class Group extends \yii\db\ActiveRecord
     public static function isAuditAdmin($uid, $projectId)
     {
 
-        $type = static::find()
+        $user = User::findIdentity($uid);
+
+        return $user->role == User::ROLE_ADMIN;
+        /*$type = static::find()
             ->select(['type'])
             ->where(['user_id' => $uid, 'project_id' => $projectId])
             ->column();
 
 //        Command::log('uid:' . $uid . ' projectId:' . $projectId . ' type:' . $type[0] . (self::isAdmin($type[0]) ? ' admin' : ' not admin'));
 
-        return self::isAdmin($type[0]);
+        return self::isAdmin($type[0]);*/
     }
 
     /**
