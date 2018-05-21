@@ -385,11 +385,12 @@ class WalleController extends Controller
         $slb = SlbFactory::getSlb($this->conf->slb_type);
         $slbConfig = SlbFactory::getSlbConfig($this->conf);
 
-        $weights = $slb->getWeightByIps($slbConfig);
+        $result = $slb->getWeightAndNameByIps($slbConfig);
 
         return $this->render('deploy', [
             'task' => $this->task,
-            'weight' => $weights
+            'weight' => $result['weight'],
+            'name' => $result['name']
         ]);
     }
 
@@ -421,7 +422,7 @@ class WalleController extends Controller
             $host_array = \app\components\GlobalHelper::str2arr($hosts);
 
             $taskStateManager = new TaskStateManager();
-            $weights = $slb->getWeightByIps($slbConfig);
+            $weights = $slb->getWeightAndNameByIps($slbConfig)['weight'];
             $resultArray = [];
             foreach ($host_array as $host) {
                 $resultArray[] = array(
@@ -459,7 +460,7 @@ class WalleController extends Controller
         $host_array = \app\components\GlobalHelper::str2arr($hosts);
 
         $taskStateManager = new TaskStateManager();
-        $weights = $slb->getWeightByIps($slbConfig);
+        $weights = $slb->getWeightAndNameByIps($slbConfig)['weight'];
         $resultArray = [];
         foreach ($host_array as $host) {
             $resultArray[] = array(

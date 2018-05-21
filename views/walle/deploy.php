@@ -111,7 +111,7 @@ if (\Yii::$app->params['check_machine']) {
             </button>&nbsp;<br/><br/>
 
             <?php foreach ($hosts as $host) { ?>
-                <?= $host ?>&nbsp;&nbsp;当前流量：<strong><em
+                <?=isset($name[$host]) ? $name[$host] : 'unKnow'?>&nbsp;<?= $host ?>&nbsp;&nbsp;当前流量：<strong><em
                             id="weight_<?= str_replace('.', '', $host) ?>"><?= isset($weight[$host]) ? $weight[$host] : 'unKnow' ?></em></strong>
                 <div class="status">
                     <span style="width: 28%"><i

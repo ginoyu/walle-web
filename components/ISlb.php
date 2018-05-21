@@ -30,5 +30,5 @@ interface ISlb
      * @param array $ips
      * @return mixed
      */
-    public function getWeightByIps($config = [], $ips = []);
+    public function getWeightAndNameByIps($config = [], $ips = []);
 }

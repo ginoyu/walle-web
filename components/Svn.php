@@ -55,7 +55,6 @@ class Svn extends Command
      */
     public function updateToVersion(TaskModel $task)
     {
-
         // 先更新
         $versionSvnDir = rtrim(Project::getDeployWorkspace($task->link_id), '/');
         $cmd[] = sprintf('cd %s ', $versionSvnDir);

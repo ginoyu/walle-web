@@ -320,7 +320,7 @@ class AliyunSlb implements ISlb
      * @param array $ips
      * @return mixed
      */
-    public function getWeightByIps($config = [], $ips = [])
+    public function getWeightAndNameByIps($config = [], $ips = [])
     {
         $data = $this->describeLoadBalancerAttribute($config);
 
@@ -342,6 +342,8 @@ class AliyunSlb implements ISlb
         $ecsInstance = json_decode($data);
 
         $results = [];
+        $weights = [];
+        $names = [];
         if (isset($ecsInstance) && isset($ecsInstance->Instances) && isset($ecsInstance->Instances->Instance)) {
             $ecsInstances = $ecsInstance->Instances->Instance;
             foreach ($ecsInstances as $instance) {
@@ -355,11 +357,12 @@ class AliyunSlb implements ISlb
                     } else {
                         Command::log($instance->InstanceId . " has not ip params!");
                     }
-                    $results[$ip] = $serverIds[$instance->InstanceId];
+                    $weights[$ip] = $serverIds[$instance->InstanceId];
+                    $names[$ip] = $instance->InstanceId;
                 }
             }
         }
 
-        return $results;
+        return $results = array('weight' => $weights, 'name' => $names);
     }
 }
