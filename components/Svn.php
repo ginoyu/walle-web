@@ -291,7 +291,7 @@ class Svn extends Command
     {
 
         if ($project->repo_mode == Project::REPO_MODE_NONTRUNK) {
-            return $project->repo_url;;
+            return $project->repo_url;
         } elseif ($branch == 'trunk') {
             return sprintf('%s/trunk', $project->repo_url);
         } elseif ($project->repo_mode == Project::REPO_MODE_BRANCH) {

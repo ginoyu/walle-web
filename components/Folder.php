@@ -15,25 +15,39 @@ use app\models\Task as TaskModel;
 class Folder extends Ansible {
 
     /**
+     * @param $cmd
+     * @return string
+     */
+    private function _getSvnCmd($cmd)
+    {
+        return sprintf('/usr/bin/env LC_ALL=en_US.UTF-8 %s --username=%s --password=%s --non-interactive --trust-server-cert',
+            $cmd, escapeshellarg($this->config->repo_username), escapeshellarg($this->config->repo_password));
+    }
+
+    /**
      * 初始化宿主机部署工作空间
      *
      * @param TaskModel $task
      * @return bool|int
      */
-    public function initLocalWorkspace(TaskModel $task) {
+    public function initLocalWorkspace(TaskModel $task)
+    {
+        try {
+            $version = $task->link_id;
+            $branch = $task->branch;
 
-        $version = $task->link_id;
-        $branch = $task->branch;
-
-        if ($this->config->repo_type == Project::REPO_SVN) {
-            // svn cp 过来指定分支的目录, 然后 svn up 到指定版本
-            $cmd[] = $this->_getSvnCmd(sprintf('svn checkout -q %s %s', escapeshellarg(Svn::getBranchUrl($branch, $this->config))), Project::getDeployWorkspace($version));
-        } else {
-            // git cp 仓库, 然后 checkout 切换分支, up 到指定版本
-            $cmd[] = sprintf('cp -rf %s %s ', Project::getDeployFromDir(), Project::getDeployWorkspace($version));
+            if ($this->config->repo_type == Project::REPO_SVN) {
+                // svn cp 过来指定分支的目录, 然后 svn up 到指定版本
+                $cmd[] = $this->_getSvnCmd(sprintf('svn checkout -q %s %s', escapeshellarg(Svn::getBranchUrl($branch, $this->config))), Project::getDeployWorkspace($version));
+            } else {
+                // git cp 仓库, 然后 checkout 切换分支, up 到指定版本
+                $cmd[] = sprintf('cp -rf %s %s ', Project::getDeployFromDir(), Project::getDeployWorkspace($version));
+            }
+            $command = join(' && ', $cmd);
+            return $this->runLocalCommand($command);
+        } catch (\Exception $e) {
+            Command::log('exception happend!' . $e->getTraceAsString());
         }
-        $command = join(' && ', $cmd);
-        return $this->runLocalCommand($command);
     }
 
     /**
