@@ -437,7 +437,7 @@ class WalleController extends Controller
 
             $this->renderJson($record);
         } catch (\Exception $e) {
-            Command::log('actionGetProcess exception happend!' . $e->getTraceAsString());
+//            Command::log('actionGetProcess exception happend!' . $e->getTraceAsString());
             $this->renderJson(array('subTaskStatus' => []));
         }
     }
@@ -571,6 +571,7 @@ class WalleController extends Controller
     private function _initWorkspace()
     {
         $sTime = Command::getMs();
+        Command::log('_initWorkspace before');
         // 本地宿主机工作区初始化
         $this->walleFolder->initLocalWorkspace($this->task);
 
