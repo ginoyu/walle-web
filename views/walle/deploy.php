@@ -295,7 +295,7 @@ if (\Yii::$app->params['check_machine']) {
                     $('.progress-status').parent().removeClass('progress-striped');
                     $('.result-success').show();
                     $('#skip_manual_test').attr('disabled', true);
-                    hideWeight();
+                    // hideWeight();
                 } else {
                     setTimeout(getProcess, 600);
                 }
