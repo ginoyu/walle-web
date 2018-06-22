@@ -80,10 +80,15 @@ class WalleController extends Controller
         if (!in_array($this->task->status, [TaskModel::STATUS_PASS, TaskModel::STATUS_FAILED])) {
             throw new \Exception(yii::t('walle', 'deployment only done for once'));
         }
+
+        $taskStateManager = new TaskStateManager();
+        if ($taskStateManager->isRunningTask($taskId)) {
+            throw new \Exception('task:' . $this->task->commit_id . " " . $this->task->title . ' already started');
+        }
+
         // 清除历史记录
         Record::deleteAll(['task_id' => $this->task->id]);
 
-        $taskStateManager = new TaskStateManager();
         $taskStateManager->setRunningTask($taskId);
 
         // 项目配置
