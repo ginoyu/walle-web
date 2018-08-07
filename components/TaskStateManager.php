@@ -215,5 +215,24 @@ class TaskStateManager
         return md5($taskId . $host . 'min_flow_test');
     }
 
+    public static function getContinueNextKey($taskId)
+    {
+        return md5($taskId . 'continue_next');
+    }
+
+    public function isContinueNext($taskId)
+    {
+        $result = 'true';
+        if ($this->redis->exists($this->getContinueNextKey($taskId))) {
+            $result = $this->redis->get($this->getContinueNextKey($taskId));
+        }
+        return strcmp('true', $result) == 0 ? 1 : 0;
+    }
+
+    public function setContinueNext($taskId, $value = 'true')
+    {
+        $this->redis->set($this->getContinueNextKey($taskId), $value);
+    }
+
 
 }

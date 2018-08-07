@@ -11,10 +11,12 @@ use yii\helpers\Url;
 $hosts = \app\components\GlobalHelper::str2arr($task->project->hosts);
 $taskManger = new \app\components\TaskStateManager();
 $isRunning = $taskManger->isRunningTask($task->id);
+$isContinue = $taskManger->isContinueNext($task->id);
 $manualTimeout = \app\components\AlertUtils::getTime(\Yii::$app->params['manual.timeout']);
 $autoTimeout = \app\components\AlertUtils::getTime(\Yii::$app->params['auto.timeout']);
 $isHostChanged = 0;
 $onlineIps = array_keys($weight);
+
 if (\Yii::$app->params['check_machine']) {
     foreach ($onlineIps as $ip) {
         if (!in_array($ip, $hosts)) {
@@ -108,10 +110,15 @@ if (\Yii::$app->params['check_machine']) {
                     style="display: <?= $isRunning ? '' : 'none' ?>"
                     onclick="skipManualTest('<?= $task->id ?>')" <?= $taskManger->getTaskManualTestAllPass($task->id) ? 'disabled' : '' ?> >
                 跳过人工测试
-            </button>&nbsp;<br/><br/>
+            </button>&nbsp;
+            <button id="continue_online" type="button" class="btn btn-primary"
+                    style="display: <?= $isContinue ? 'none' : '' ?>" onclick="continueOnline('<?= $task->id ?>')">
+                继续上线
+            </button>
+            <br/><br/>
 
             <?php foreach ($hosts as $host) { ?>
-                <?=isset($name[$host]) ? $name[$host] : 'unKnow'?>&nbsp;<?= $host ?>&nbsp;&nbsp;当前流量：<strong><em
+                <?= isset($name[$host]) ? $name[$host] : 'unKnow' ?>&nbsp;<?= $host ?>&nbsp;&nbsp;当前流量：<strong><em
                             id="weight_<?= str_replace('.', '', $host) ?>"><?= isset($weight[$host]) ? $weight[$host] : 'unKnow' ?></em></strong>
                 <div class="status">
                     <span style="width: 28%"><i
@@ -192,6 +199,18 @@ if (\Yii::$app->params['check_machine']) {
             } else {
                 $('#skip_manual_test').addClass('disabled');
                 alert('跳过人工测试成功');
+            }
+        });
+    }
+
+    function continueOnline(taskId) {
+        $.get('/walle/continue-online', {
+            taskId: taskId
+        }, function (o) {
+            if (o.code != 0) {
+                $('#continue_online').removeClass('disabled');
+            } else {
+                $('#continue_online').addClass('disabled');
             }
         });
     }
@@ -284,6 +303,7 @@ if (\Yii::$app->params['check_machine']) {
                     $('.btn-deploy').attr('disabled', false);
                     $('#skip_manual_test').attr('disabled', true);
                     hideWeight();
+                    $('#continue_online').hide();
                     return;
                 } else {
                     $('.progress-status')
@@ -295,9 +315,16 @@ if (\Yii::$app->params['check_machine']) {
                     $('.progress-status').parent().removeClass('progress-striped');
                     $('.result-success').show();
                     $('#skip_manual_test').attr('disabled', true);
+                    $('#continue_online').hide();
                     // hideWeight();
                 } else {
-                    setTimeout(getProcess, 600);
+                    var continueNex = data.continue;
+                    if (!continueNex) {
+                        $('#continue_online').show();
+                    } else {
+                        $('#continue_online').hide();
+                    }
+                    setTimeout(getProcess, 1000);
                 }
                 for (var i = 1; i <= data.step; i++) {
                     $('.step-' + i).removeClass('text-yellow text-red')
@@ -313,7 +340,8 @@ if (\Yii::$app->params['check_machine']) {
 
             $('.progress-status').attr('aria-valuenow', 10).width('10%');
             $('.result-failed').hide();
-            setTimeout(getProcess, 600);
+
+            setTimeout(getProcess, 1000);
         } else {
             $('.btn-deploy').attr('disabled', false);
         }
@@ -346,7 +374,7 @@ if (\Yii::$app->params['check_machine']) {
             $('#skip_manual_test').show();
             $('#skip_manual_test').attr('disabled', false);
 
-            setTimeout(getProcess, 600);
+            setTimeout(getProcess, 1000);
         });
 
         var _hmt = _hmt || [];

@@ -406,6 +406,7 @@ class WalleController extends Controller
      */
     public function actionGetProcess($taskId)
     {
+        $taskStateManager = new TaskStateManager();
         try {
             $record = Record::find()
                 ->select(['percent' => 'action', 'status', 'memo', 'command'])
@@ -426,7 +427,6 @@ class WalleController extends Controller
 
             $host_array = \app\components\GlobalHelper::str2arr($hosts);
 
-            $taskStateManager = new TaskStateManager();
             $weights = $slb->getWeightAndNameByIps($slbConfig)['weight'];
             $resultArray = [];
             foreach ($host_array as $host) {
@@ -439,11 +439,12 @@ class WalleController extends Controller
             }
 
             $record['subTaskStatus'] = $resultArray;
+            $record['continue'] = $taskStateManager->isContinueNext($taskId);
 
             $this->renderJson($record);
         } catch (\Exception $e) {
 //            Command::log('actionGetProcess exception happend!' . $e->getTraceAsString());
-            $this->renderJson(array('subTaskStatus' => []));
+            $this->renderJson(array('subTaskStatus' => [], 'continue' => $taskStateManager->isContinueNext($taskId)));
         }
     }
 
@@ -489,6 +490,7 @@ class WalleController extends Controller
         $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
         $code = 0;
         $msg = 'success';
+        Command::log('Notify test result params:' . json_encode($params));
         if (!$conResult) {
             $code = -110;// redis connect failed
             $msg = 'redis connect failed';
@@ -499,6 +501,11 @@ class WalleController extends Controller
             } else {
                 $redis->set($params['randomKey'], json_encode($params), 60);
                 Command::log('redis value set success:' . $redis->get($params['randomKey']));
+                // get continue next value
+                $continue = $continue = $params['continue'];
+                $taskId = $params['taskId'];
+                $redis->set(TaskStateManager::getContinueNextKey($taskId), $continue);
+                Command::log('redis value set continue success:' . $redis->get(askStateManager::getContinueNextKey($taskId)));
             }
         }
         $this->renderJson($params, $code, $msg);
@@ -521,12 +528,43 @@ class WalleController extends Controller
         $this->renderJson($params, $code, $msg);
     }
 
+    public function actionContinueOnline($taskId)
+    {
+        $params = \Yii::$app->request->get();
+        $code = 0;
+        $msg = 'success';
+
+        $taskManger = new TaskStateManager();
+        $taskManger->setContinueNext($taskId);
+        Command::log('actionContinueOnline:' . $taskManger->isContinueNext($taskId));
+        $this->renderJson($params, $code, $msg);
+    }
+
     public function actionPreview($host, $taskId)
     {
         $this->layout = 'new_modal';
+        if (!$this->task) {
+            $this->task = TaskModel::findOne($taskId);
+        }
+        if (!$this->conf) {
+            $this->conf = Project::getConf($this->task->project_id);
+        }
+        $hosts = GlobalHelper::str2arr($this->conf->hosts);
+        $last = 0;
+        $index = 1;
+        foreach ($hosts as $h) {
+            if (strcmp($h, $host) == 0) {
+                break;
+            }
+            $index++;
+        }
+        if (count($hosts) == $index) {
+            $last = 1;
+        }
         return $this->render('manual_pass', [
             'host' => $host,
-            'taskId' => $taskId
+            'taskId' => $taskId,
+            'last' => $last
         ]);
     }
 
@@ -742,6 +780,9 @@ class WalleController extends Controller
             $slbConfig = SlbFactory::getSlbConfig($this->conf);
             $statusManager = new TaskStateManager();
             $user = User::findIdentity($this->task->user_id);
+
+            $machineCount = count($hosts);
+            $index = 0;
             foreach ($hosts as $host) {
                 $statusManager->clearStatus($this->task->id, $host);
 
@@ -827,6 +868,13 @@ class WalleController extends Controller
 
                 $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_ONLINE_SUCCESS);
                 Command::log('step5 remote server:' . $host . ' switch origin ' . $originWeight . 'slb success');
+
+                $index++;
+                if ($index < $machineCount) {
+                    // check continue status
+                    $this->waitContinueResult();
+                }
+
             }
 
             if (!$executeResult) {
@@ -851,6 +899,8 @@ class WalleController extends Controller
         foreach ($hosts as $host) {
             $statusManager->clearStatus($this->task->id, $host);
         }
+        $statusManager->setContinueNext($this->task->id);
+
     }
 
     private function dealSlbError($command, $duration)
@@ -939,6 +989,42 @@ class WalleController extends Controller
             return true;
         }
 
+    }
+
+    private function waitContinueResult()
+    {
+        $redis = new \Redis();
+        $conResult = $redis->connect(\Yii::$app->params['redis']['url'], \Yii::$app->params['redis']['port']);
+        if (!$conResult) {
+            Command::log('waitContinueResult redis connect error');
+            return;
+        }
+        $taskId = $this->task->id;
+
+        $randomKey = TaskStateManager::getContinueNextKey($taskId);
+
+        $waitTime = 0;
+        $maxWaitTime = \Yii::$app->params['manual.timeout'];// 15min timeout
+        $continue = 'true';
+        if ($redis->exists($randomKey)) {
+            $continue = $redis->get($randomKey);
+        }
+        while (strcmp('false', $continue) == 0) {
+            if ($waitTime >= $maxWaitTime) {
+                Command::log('waitContinueResult timeout!');
+                break;
+            }
+            if ($redis->exists($randomKey)) {
+                $continue = $redis->get($randomKey);
+            } else {
+                break;
+            }
+            $waitTime += 1;
+            sleep(1);
+        }
+
+        // close
+        $redis->close();
     }
 
     private function waitManualTestResult($host, $originWeight)

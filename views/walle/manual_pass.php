@@ -18,9 +18,19 @@ $randomKey = time();
                 <option value="10">10</option>
                 <option value="0">0</option>
             </select>
+            <br/><br/>
+            <div class="form-group" style="display: <?= $last ? 'none' : '' ?>">
+                是否立即开始上线下一个机器:
+                <input id="online_next_<?= $randomKey ?>" value="1"
+                       type="checkbox" checked
+                       class="ace ace-switch ace-switch-5"
+                       data-rel="tooltip" data-title="是否立即开始上线下一个机器" data-placement="right">
+                <span class="lbl"></span>
+            </div>
             <span class="lbl"></span>
         </label>
     </div>
+    <br/>
     <div align="center">
         <button type="button" class="btn btn-primary" data-dismiss="modal"
                 onclick="pass_click('<?= $host ?>','<?= \app\components\TaskStateManager::getManualResultKey($taskId, $host) ?>','<?= $randomKey ?>')">
@@ -37,10 +47,13 @@ $randomKey = time();
 
     function pass_click(host, randomKey, key) {
         var weight = $('#online_weight_' + key).val();
+        var continueNext = document.getElementById('online_next_' + key).checked;
         $.get('/walle/notify-test-result', {
             success: true,
             randomKey: randomKey,
-            weight: weight
+            weight: weight,
+            continue: continueNext,
+            taskId:<?=$taskId?>
         }, function (o) {
             // alert(JSON.stringify(o));
             if (o.code != 0) {
