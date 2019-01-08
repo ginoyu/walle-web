@@ -502,10 +502,14 @@ class WalleController extends Controller
                 $redis->set($params['randomKey'], json_encode($params), 60);
                 Command::log('redis value set success:' . $redis->get($params['randomKey']));
                 // get continue next value
-                $continue = $continue = $params['continue'];
-                $taskId = $params['taskId'];
-                $redis->set(TaskStateManager::getContinueNextKey($taskId), $continue);
-                Command::log('redis value set continue success:' . $redis->get(askStateManager::getContinueNextKey($taskId)));
+                if (isset($params['continue']) && isset($params['taskId'])) {
+                    $continue = $continue = $params['continue'];
+                    $taskId = $params['taskId'];
+                    $redis->set(TaskStateManager::getContinueNextKey($taskId), $continue);
+                    Command::log('redis value set continue success:' . $redis->get(TaskStateManager::getContinueNextKey($taskId)));
+                } else {
+                    Command::log('redis value set continue failed!');
+                }
             }
         }
         $this->renderJson($params, $code, $msg);
