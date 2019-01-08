@@ -29,6 +29,7 @@ class AliyunSlb implements ISlb
     const KEY_TIMESTAMP = "Timestamp";
     const KEY_SIGNATURE_VERSION = "SignatureVersion";
     const KEY_SIGNATURE_NONCE = "SignatureNonce";
+    const KEY_PAGE_SIZE = 'PageSize';
 
     // private params
     const KEY_ACTION = "Action";
@@ -73,7 +74,7 @@ class AliyunSlb implements ISlb
     {
         $data = $this->describeLoadBalancerAttribute($config);
 
-//        Command::log('get ecs ip describeLoadBalancerAttribute:' . $data);
+        Command::log('get ecs ip describeLoadBalancerAttribute:' . $data);
 
         $balanceInfo = json_decode($data);
         $serverIds = [];
@@ -87,7 +88,7 @@ class AliyunSlb implements ISlb
 
         $data = $this->getInstances($config, $serverIds);
 
-//        Command::log('get ecs ip list:' . json_encode($serverIds) . ' ===' . $data);
+        Command::log('get ecs ip list:' . json_encode($serverIds) . ' ===' . $data);
         $ecsInstance = json_decode($data);
 
         $results = [];
@@ -120,7 +121,8 @@ class AliyunSlb implements ISlb
             self::KEY_ACTION => self::ACTION_DESCRIBE_INSTANCES,
             self::KEY_VERSION => self::CURL_ECS_VERSION,
             self::KEY_REGION_ID => $this->mRegionId,
-            self::KEY_INSTANCES => json_encode($intances)
+            self::KEY_INSTANCES => json_encode($intances),
+            self::KEY_PAGE_SIZE => 100
         ];
         $data = $this->requestAliSlbService(self::CURL_ECS_URL, $params);
         return $data;
