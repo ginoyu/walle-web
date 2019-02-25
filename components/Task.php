@@ -98,7 +98,7 @@ class Task extends Ansible {
      * @param $version string
      * @return string string
      */
-    public static function getRemoteTaskCommand($task, $version) {
+    public static function getRemoteTaskCommand($task, $version, $tag='') {
         $tasks = GlobalHelper::str2arr($task);
         if (empty($tasks)) return '';
 
@@ -109,10 +109,12 @@ class Task extends Ansible {
         $pattern = [
             '#{WORKSPACE}#',
             '#{VERSION}#',
+            '#{TAG}#',
         ];
         $replace = [
             $workspace,
             $version,
+            $tag,
         ];
 
         // 简化用户切换目录，直接切换到当前的版本目录：{release_library}/{project}/{version}
