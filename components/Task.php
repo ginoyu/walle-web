@@ -37,6 +37,7 @@ class Task extends Ansible {
         ];
 
         // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
+        $cmd[] = "mkdir -p {$workspace}";
         $cmd[] = "cd {$workspace}";
         foreach ($tasks as $task) {
             $cmd[] = preg_replace($pattern, $replace, $task);
@@ -70,6 +71,7 @@ class Task extends Ansible {
         ];
 
         // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
+        $cmd[] = "mkdir -p {$workspace}";
         $cmd[] = "cd {$workspace}";
         foreach ($tasks as $task) {
             $cmd[] = preg_replace($pattern, $replace, $task);
@@ -128,6 +130,7 @@ class Task extends Ansible {
         ];
 
         // 简化用户切换目录，直接切换到当前的版本目录：{release_library}/{project}/{version}
+        $cmd[] = "mkdir -p {$workspace}";
         $cmd[] = "cd {$version}";
         foreach ($tasks as $task) {
             $cmd[] = preg_replace($pattern, $replace, $task);
