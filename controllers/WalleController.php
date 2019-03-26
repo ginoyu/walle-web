@@ -746,7 +746,11 @@ class WalleController extends Controller
     {
         $cmd = [];
         // pre-release task
-        if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version))) {
+        $tag = '';
+        if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
+            $tag = $this->task->commit_id;
+        }
+        if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version, $tag))) {
             $cmd[] = $preRelease;
         }
         // link
@@ -754,7 +758,7 @@ class WalleController extends Controller
             $cmd[] = $linkCmd;
         }
         // post-release task
-        if (($postRelease = WalleTask::getRemoteTaskCommand($this->conf->post_release, $version))) {
+        if (($postRelease = WalleTask::getRemoteTaskCommand($this->conf->post_release, $version, $tag))) {
             $cmd[] = $postRelease;
         }
 
