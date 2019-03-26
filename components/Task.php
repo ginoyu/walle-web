@@ -18,7 +18,7 @@ class Task extends Ansible {
      *
      * @return bool
      */
-    public function preDeploy($version) {
+    public function preDeploy($version, $tag='', $project='') {
         $tasks = GlobalHelper::str2arr($this->getConfig()->pre_deploy);
         if (empty($tasks)) return true;
 
@@ -27,9 +27,13 @@ class Task extends Ansible {
         $workspace = rtrim(Project::getDeployWorkspace($version), '/');
         $pattern = [
             '#{WORKSPACE}#',
+            '#{PROJECT}#',
+            '#{TAG}#',
         ];
         $replace = [
             $workspace,
+            $tag,
+            $project,
         ];
 
         // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
@@ -47,7 +51,7 @@ class Task extends Ansible {
      *
      * @return bool
      */
-    public function postDeploy($version, $tag='') {
+    public function postDeploy($version, $tag='', $project) {
         $tasks = GlobalHelper::str2arr($this->getConfig()->post_deploy);
         if (empty($tasks)) return true;
 
@@ -56,11 +60,13 @@ class Task extends Ansible {
         $workspace = rtrim(Project::getDeployWorkspace($version), '/');
         $pattern = [
             '#{WORKSPACE}#',
+            '#{PROJECT}#',
             '#{TAG}#',
         ];
         $replace = [
             $workspace,
             $tag,
+            $project,
         ];
 
         // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
@@ -100,7 +106,7 @@ class Task extends Ansible {
      * @param $version string
      * @return string string
      */
-    public static function getRemoteTaskCommand($task, $version, $tag='') {
+    public static function getRemoteTaskCommand($task, $version, $tag='', $project='') {
         $tasks = GlobalHelper::str2arr($task);
         if (empty($tasks)) return '';
 
@@ -112,11 +118,13 @@ class Task extends Ansible {
             '#{WORKSPACE}#',
             '#{VERSION}#',
             '#{TAG}#',
+            '#{PROJECT}#'
         ];
         $replace = [
             $workspace,
             $version,
             $tag,
+            $project,
         ];
 
         // 简化用户切换目录，直接切换到当前的版本目录：{release_library}/{project}/{version}
