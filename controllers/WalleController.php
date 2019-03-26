@@ -502,10 +502,14 @@ class WalleController extends Controller
                 $redis->set($params['randomKey'], json_encode($params), 60);
                 Command::log('redis value set success:' . $redis->get($params['randomKey']));
                 // get continue next value
-                $continue = $continue = $params['continue'];
-                $taskId = $params['taskId'];
-                $redis->set(TaskStateManager::getContinueNextKey($taskId), $continue);
-                Command::log('redis value set continue success:' . $redis->get(askStateManager::getContinueNextKey($taskId)));
+                if (isset($params['continue']) && isset($params['taskId'])) {
+                    $continue = $continue = $params['continue'];
+                    $taskId = $params['taskId'];
+                    $redis->set(TaskStateManager::getContinueNextKey($taskId), $continue);
+                    Command::log('redis value set continue success:' . $redis->get(TaskStateManager::getContinueNextKey($taskId)));
+                } else {
+                    Command::log('redis value set continue failed!');
+                }
             }
         }
         $this->renderJson($params, $code, $msg);
@@ -691,7 +695,12 @@ class WalleController extends Controller
     private function _postDeploy()
     {
         $sTime = Command::getMs();
-        $ret = $this->walleTask->postDeploy($this->task->link_id);
+
+        $tag = '';
+        if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
+            $tag = $this->task->commit_id;
+        }
+        $ret = $this->walleTask->postDeploy($this->task->link_id, $tag);
         // 记录执行时间
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_POST_DEPLOY, $duration);
@@ -741,8 +750,12 @@ class WalleController extends Controller
     private function _updateRemoteServers($version, $delay = 0, $rollback = false)
     {
         $cmd = [];
+        $tag = '';
+        if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
+            $tag = $this->task->commit_id;
+        }
         // pre-release task
-        if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version))) {
+        if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version, $tag))) {
             $cmd[] = $preRelease;
         }
         // link
@@ -750,7 +763,7 @@ class WalleController extends Controller
             $cmd[] = $linkCmd;
         }
         // post-release task
-        if (($postRelease = WalleTask::getRemoteTaskCommand($this->conf->post_release, $version))) {
+        if (($postRelease = WalleTask::getRemoteTaskCommand($this->conf->post_release, $version, $tag))) {
             $cmd[] = $postRelease;
         }
 
@@ -1196,3 +1209,4 @@ class WalleController extends Controller
     }
 
 }
+

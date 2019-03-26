@@ -47,7 +47,7 @@ class Task extends Ansible {
      *
      * @return bool
      */
-    public function postDeploy($version) {
+    public function postDeploy($version, $tag='') {
         $tasks = GlobalHelper::str2arr($this->getConfig()->post_deploy);
         if (empty($tasks)) return true;
 
@@ -56,9 +56,11 @@ class Task extends Ansible {
         $workspace = rtrim(Project::getDeployWorkspace($version), '/');
         $pattern = [
             '#{WORKSPACE}#',
+            '#{TAG}#',
         ];
         $replace = [
             $workspace,
+            $tag,
         ];
 
         // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
@@ -98,7 +100,7 @@ class Task extends Ansible {
      * @param $version string
      * @return string string
      */
-    public static function getRemoteTaskCommand($task, $version) {
+    public static function getRemoteTaskCommand($task, $version, $tag='') {
         $tasks = GlobalHelper::str2arr($task);
         if (empty($tasks)) return '';
 
@@ -109,10 +111,12 @@ class Task extends Ansible {
         $pattern = [
             '#{WORKSPACE}#',
             '#{VERSION}#',
+            '#{TAG}#',
         ];
         $replace = [
             $workspace,
             $version,
+            $tag,
         ];
 
         // 简化用户切换目录，直接切换到当前的版本目录：{release_library}/{project}/{version}
