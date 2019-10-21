@@ -25,24 +25,15 @@ class Git extends Command {
         $dotGit = rtrim($gitDir, '/') . '/.git';
         // 存在git目录，直接pull
         if (file_exists($dotGit)) {
-            $cmd[] = sprintf('cd %s ', $gitDir);
-            $cmd[] = sprintf('/usr/bin/env git checkout -q %s', $branch);
-            $cmd[] = sprintf('/usr/bin/env git fetch -p -q --all');
-            $cmd[] = sprintf('/usr/bin/env git reset -q --hard origin/%s', $branch);
-            $cmd[] = sprintf('/usr/bin/env git submodule update --init');
-            $command = join(' && ', $cmd);
-            return $this->runLocalCommand($command);
+            $cmd[] = sprintf('rm -rf %s ', $gitDir);
         }
-        // 不存在，则先checkout
-        else {
-            $cmd[] = sprintf('mkdir -p %s ', $gitDir);
-            $cmd[] = sprintf('cd %s ', $gitDir);
-            $cmd[] = sprintf('/usr/bin/env git clone -q %s .', $this->getConfig()->repo_url);
-            $cmd[] = sprintf('/usr/bin/env git checkout -q %s', $branch);
-            $cmd[] = sprintf('/usr/bin/env git submodule update --init');
-            $command = join(' && ', $cmd);
-            return $this->runLocalCommand($command);
-        }
+        $cmd[] = sprintf('mkdir -p %s ', $gitDir);
+        $cmd[] = sprintf('cd %s ', $gitDir);
+        $cmd[] = sprintf('/usr/bin/env git clone -q %s .', $this->getConfig()->repo_url);
+        $cmd[] = sprintf('/usr/bin/env git checkout -q %s', $branch);
+        $cmd[] = sprintf('/usr/bin/env git submodule update --init');
+        $command = join(' && ', $cmd);
+        return $this->runLocalCommand($command);
     }
 
     /**
