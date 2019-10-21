@@ -166,3 +166,4 @@ class Git extends Command {
     }
 
 }
+

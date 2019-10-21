@@ -2,3 +2,5 @@
 /config/local.php
 tests/_output/*
 .idea/
+*.bak
+.*.swp
