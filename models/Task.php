@@ -44,7 +44,7 @@ class Task extends \yii\db\ActiveRecord
     /**
      * 任务通过
      */
-    const STATUS_PASS   = 1;
+    const STATUS_PASS = 1;
 
     /**
      * 任务拒绝
@@ -54,7 +54,7 @@ class Task extends \yii\db\ActiveRecord
     /**
      * 任务上线完成
      */
-    const STATUS_DONE   = 3;
+    const STATUS_DONE = 3;
 
     /**
      * 任务上线失败
@@ -84,7 +84,7 @@ class Task extends \yii\db\ActiveRecord
     /**
      * 可回滚
      */
-    const ROLLBACK_TRUE  = 1;
+    const ROLLBACK_TRUE = 1;
 
     /**
      * 不可回滚
@@ -133,7 +133,7 @@ class Task extends \yii\db\ActiveRecord
             [['user_id', 'project_id', 'status', 'title'], 'required'],
             [['user_id', 'project_id', 'action', 'status', 'file_transmission_mode'], 'integer'],
             [['created_at', 'updated_at'], 'safe'],
-            [['file_list','remark'], 'string'],
+            [['file_list', 'remark'], 'string'],
             [['title', 'link_id', 'ex_link_id', 'commit_id', 'branch'], 'string', 'max' => 100],
         ];
     }
@@ -163,7 +163,8 @@ class Task extends \yii\db\ActiveRecord
      * @param $status
      * @return bool
      */
-    public static function canDeploy($status) {
+    public static function canDeploy($status)
+    {
         return in_array($status, [static::STATUS_PASS, static::STATUS_FAILED]);
     }
 
@@ -172,7 +173,8 @@ class Task extends \yii\db\ActiveRecord
      *
      * @return \yii\db\ActiveQuery
      */
-    public function getUser() {
+    public function getUser()
+    {
         return $this->hasOne(User::className(), ['id' => 'user_id']);
     }
 
@@ -181,7 +183,8 @@ class Task extends \yii\db\ActiveRecord
      *
      * @return \yii\db\ActiveQuery
      */
-    public function getProject() {
+    public function getProject()
+    {
         return $this->hasOne(Project::className(), ['id' => 'project_id']);
     }
 
@@ -190,8 +193,8 @@ class Task extends \yii\db\ActiveRecord
      *
      * @return array|string
      */
-    public function getCommandFiles() {
-
+    public function getCommandFiles()
+    {
         if ($this->file_transmission_mode == static::FILE_TRANSMISSION_MODE_FULL) {
             return '.';
         } elseif ($this->file_transmission_mode == static::FILE_TRANSMISSION_MODE_PART && $this->file_list) {
@@ -211,7 +214,18 @@ class Task extends \yii\db\ActiveRecord
      */
     public function getRollbackCommitId()
     {
-        return $this->ex_link_id ? static::find()->where(['link_id'=>$this->ex_link_id])->orderBy(['id'=>SORT_ASC])->select('commit_id')->scalar():'';
+        return $this->ex_link_id ? static::find()->where(['link_id' => $this->ex_link_id])->orderBy(['id' => SORT_ASC])->select('commit_id')->scalar() : '';
+    }
+
+    public static function getLastProjectSuccessTask($projectId)
+    {
+        $taskArray = static::find()->where(['project_id' => $projectId, 'status' => Task::STATUS_DONE])->orderBy(['id' => SORT_DESC])->all();
+        if ($taskArray) {
+            foreach ($taskArray as $task) {
+                return $task;
+            }
+        }
+        return false;
     }
 
 }

@@ -25,6 +25,7 @@ use app\models\Project;
 use app\models\Group;
 use app\models\Record;
 use app\models\Task as TaskModel;
+use app\models\Task;
 use app\models\User;
 use yii;
 
@@ -135,6 +136,7 @@ class WalleController extends Controller
 
             // 记录当前线上版本（软链）回滚则是回滚的版本，上线为新版本
             $this->conf->version = $this->task->link_id;
+            $this->conf->commit_id = $this->task->commit_id;
             $this->conf->save();
 
             $dingding->sendToAll(AlertUtils::getOnlineSuccess($this->task));
@@ -749,6 +751,8 @@ class WalleController extends Controller
      *
      * @param string $version
      * @param integer $delay 每台机器延迟执行post_release任务间隔, 不推荐使用, 仅当业务无法平滑重启时使用
+     * @param bool $rollback
+     * @return bool
      * @throws \Exception
      */
     private function _updateRemoteServers($version, $delay = 0, $rollback = false)
@@ -931,10 +935,17 @@ class WalleController extends Controller
         // rollback begin
         $cmd = [];
 
-        $tag = '';
-        if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
-            $tag = $this->task->commit_id;
+        $tag = $this->conf->commit_id;
+
+        if (empty($tag)) {
+            $lastSuccessTask = Task::getLastProjectSuccessTask($this->conf->id);
+            if ($lastSuccessTask) {
+                $tag = $lastSuccessTask->commit_id;
+            }
         }
+
+        Command::log('dealSlbError tag:' . $tag);
+
         // pre-release task
         if (($preRelease = WalleTask::getRemoteTaskCommand($this->conf->pre_release, $version, $tag, $this->conf->name))) {
             $cmd[] = $preRelease;

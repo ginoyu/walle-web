@@ -104,6 +104,8 @@ class Task extends Ansible {
      *
      * @param $task    string
      * @param $version string
+     * @param string $tag
+     * @param string $project
      * @return string string
      */
     public static function getRemoteTaskCommand($task, $version, $tag='', $project='') {
@@ -113,7 +115,7 @@ class Task extends Ansible {
         // 可能要做一些依赖环境变量的命令操作
         $cmd = ['. /etc/profile'];
         $workspace = Project::getTargetWorkspace();
-        $version   = Project::getReleaseVersionDir($version);
+        $version = Project::getReleaseVersionDir($version);
         $pattern = [
             '#{WORKSPACE}#',
             '#{VERSION}#',
