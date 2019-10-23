@@ -69,7 +69,9 @@ class WalleController extends Controller
         $taskId = \Yii::$app->request->post('taskId');
         if (!$taskId) {
             $this->renderJson([], -1, yii::t('walle', 'deployment id is empty'));
+            return;
         }
+
         $this->task = TaskModel::findOne($taskId);
         if (!$this->task) {
             throw new \Exception(yii::t('walle', 'deployment id not exists'));
@@ -85,6 +87,13 @@ class WalleController extends Controller
         $taskStateManager = new TaskStateManager();
         if ($taskStateManager->isRunningTask($taskId)) {
             throw new \Exception('task:' . $this->task->commit_id . " " . $this->task->title . ' already started');
+        }
+
+        $slbId = SlbFactory::getSlbId($this->conf);
+
+        if ($slbId && $taskStateManager->isRunningSlb($slbId)) {
+            $this->renderJson([], -1, yii::t('walle', '您使用的slb有服务正在上线，请等待！'));
+            return;
         }
 
         // 清除历史记录
@@ -148,11 +157,9 @@ class WalleController extends Controller
             // 清理本地部署空间
             $this->_cleanUpLocal($this->task->link_id);
 
-            $taskStateManager->clearRunningTaskState($taskId);
-
             $dingding->sendToAll(AlertUtils::getOnlineFailed($this->task));
         }
-        $taskStateManager->clearRunningTaskState($taskId);
+        $taskStateManager->clearRunningTaskState($taskId, $slbId);
         $this->renderJson([]);
     }
 
@@ -758,10 +765,6 @@ class WalleController extends Controller
     private function _updateRemoteServers($version, $delay = 0, $rollback = false)
     {
         $cmd = [];
-        $tag = '';
-        if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
-            $tag = $this->task->commit_id;
-        }
         // pre-release task
         $tag = '';
         if ($this->conf->repo_mode == Project::REPO_MODE_TAG && $this->conf->repo_type == Project::REPO_GIT) {
@@ -805,14 +808,32 @@ class WalleController extends Controller
             $slbConfig = SlbFactory::getSlbConfig($this->conf);
             $statusManager = new TaskStateManager();
             $user = User::findIdentity($this->task->user_id);
-
+            $statusManager->setRunningSlbId(SlbFactory::getSlbId($this->conf));
             $machineCount = count($hosts);
             $index = 0;
+            $successHosts = [];
             foreach ($hosts as $host) {
+                array_push($successHosts, $host);
                 $statusManager->clearStatus($this->task->id, $host);
 
+                // 开始上线，设置slb的主机流量为0
                 $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_UPDATING_SERVER);
+                // slb switch
+                $switchRet1 = $slb->setBackendServerWeight($slbConfig, $host, 0);
+                $originWeight = 100;
+
+                if (!$switchRet1) {
+                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_UPDATE_SERVER_FAILED);
+                    $errorCommand = 'switch slb host:' . $host . ' failed';
+                    $errMsg = yii::t('walle', 'slb switch error');
+                    $executeResult = false;
+                    break;
+                }
+
+                Command::log('step1 remote server:' . $host . ' switch slb 0 success!');
+
                 $ret = $this->walleTask->runRemoteTaskCommandByHost($cmd, $delay, $host);
+
                 if (!$ret) {
                     $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_UPDATE_SERVER_FAILED);
                     $errorCommand = var_export($this->walleTask->getExeCommand());
@@ -821,25 +842,10 @@ class WalleController extends Controller
                     break;
                 }
 
-                Command::log('step1 remote server:' . $host . ' update files success');
+                Command::log('step2 remote server:' . $host . ' update files success');
 
                 $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DOING_AUTO_TEST);
 
-                // slb switch
-                $switchRet1 = $slb->setBackendServerWeight($slbConfig, $host, 0);
-
-//                $originWeight = $switchRet1['originWeight'];
-                $originWeight = 100;
-
-                if (!$switchRet1) {
-                    $statusManager->setStatus($this->task->id, $host, TaskStateManager::STATE_DO_AUTO_TEST_FAILED);
-                    $errorCommand = 'switch slb host:' . $host . ' failed';
-                    $errMsg = yii::t('walle', 'slb switch error');
-                    $executeResult = false;
-                    break;
-                }
-
-                Command::log('step2 remote server:' . $host . ' switch slb 0 success!');
                 // call test url
                 $testRet = $this->requestTestService($host);
                 if (!$testRet) {
@@ -847,7 +853,6 @@ class WalleController extends Controller
                     $errorCommand = 'execute test host:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'slb test error');
                     $executeResult = false;
-                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
                     break;
                 }
 
@@ -866,7 +871,6 @@ class WalleController extends Controller
                     $errorCommand = 'manual test:' . $host . ' failed';
                     $errMsg = yii::t('walle', 'manual test error');
                     $executeResult = false;
-                    $slb->setBackendServerWeight($slbConfig, $host, $originWeight);
                     break;
                 }
 
@@ -904,7 +908,7 @@ class WalleController extends Controller
 
             if (!$executeResult) {
                 $duration = Command::getMs() - $sTime;
-                $this->dealSlbError($errorCommand, $duration);
+                $this->dealSlbError($errorCommand, $duration, $successHosts, $slb, $slbConfig);
                 throw new \Exception($errMsg);
             }
 
@@ -928,7 +932,7 @@ class WalleController extends Controller
 
     }
 
-    private function dealSlbError($command, $duration)
+    private function dealSlbError($command, $duration, $successHosts, $slb, $slbConfig)
     {
         // rollback version
         $version = $this->conf->version;
@@ -959,7 +963,15 @@ class WalleController extends Controller
             $cmd[] = $postRelease;
         }
 
-        $this->walleTask->runRemoteTaskCommandPackage($cmd, 0);
+        foreach ($successHosts as $host) {
+            Command::log('dealSlbError begin rollback:' . $host);
+            // 回滚之前设置weight为0
+            $slb->setBackendServerWeight($slbConfig, $host, 0);
+            $this->walleTask->runRemoteTaskCommandByHost($cmd, 0, $host);
+            // 回滚之前设置weight为100
+            $slb->setBackendServerWeight($slbConfig, $host, 100);
+            Command::log('dealSlbError finish rollback:' . $host);
+        }
 
         // save record notify ui
         Record::saveRecordCustomCommand(0, $command, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);

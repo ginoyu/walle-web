@@ -170,7 +170,12 @@ class TaskStateManager
         $this->redis->set($this->getRunningTaskKey($taskId), $taskId);
     }
 
-    public function clearRunningTaskState($taskId)
+    public function setRunningSlbId($slbId)
+    {
+        $this->redis->set($this->getRunningSlbId($slbId), $slbId);
+    }
+
+    public function clearRunningTaskState($taskId, $slbId)
     {
         if ($this->redis->exists($this->getRunningTaskKey($taskId))) {
             $this->redis->delete($this->getRunningTaskKey($taskId));
@@ -179,6 +184,13 @@ class TaskStateManager
         if ($this->redis->exists($this->getTaskManualTestAllPassKey($taskId))) {
             $this->redis->delete($this->getTaskManualTestAllPassKey($taskId));
         }
+
+        if ($slbId) {
+            if ($this->redis->exists($this->getRunningSlbId($slbId))) {
+                $this->redis->delete($this->getRunningSlbId($slbId));
+            }
+        }
+
     }
 
     public function isRunningTask($taskId)
@@ -190,9 +202,23 @@ class TaskStateManager
         return $result;
     }
 
+    public function isRunningSlb($slbId)
+    {
+        $result = false;
+        if ($this->redis->exists($this->getRunningSlbId($slbId))) {
+            $result = $this->redis->get($this->getRunningSlbId($slbId));
+        }
+        return $result;
+    }
+
     private function getRunningTaskKey($taskId)
     {
         return 'running_task' . $taskId;
+    }
+
+    private function getRunningSlbId($slbId)
+    {
+        return 'running_slb_id_' . $slbId;
     }
 
     public static function getTaskManualTestAllPassKey($taskId)

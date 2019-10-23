@@ -168,7 +168,7 @@ class Task extends Ansible {
      * @param host
      * @return mixed
      */
-    public function runRemoteTaskCommandByHost($tasks, $delay = 0, $host)
+    public function runRemoteTaskCommandByHost($tasks, $delay, $host)
     {
         $task = join(' && ', $tasks);
 

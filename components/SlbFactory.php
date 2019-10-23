@@ -62,6 +62,18 @@ class SlbFactory
         }
     }
 
+    public static function getSlbId($project)
+    {
+        if ($project && $project->slb_status) {
+            $slbConfig = self::getSlbConfig($project);
+            switch ($project->slb_type) {
+                case ISlb::SLB_TYPE_ALIYUN:
+                    return $slbConfig[AliyunSlb::KEY_LOAD_BALANCE_ID];
+            }
+        }
+        return false;
+    }
+
     public static function getPrivateSlbConfigArray($slbType = ISlb::SLB_TYPE_ALIYUN)
     {
         switch ($slbType) {
