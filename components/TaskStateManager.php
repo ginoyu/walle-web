@@ -172,6 +172,7 @@ class TaskStateManager
 
     public function setRunningSlbId($slbId)
     {
+        Command::log('set slbId:' . $slbId);
         $this->redis->set($this->getRunningSlbId($slbId), $slbId);
     }
 
@@ -207,6 +208,9 @@ class TaskStateManager
         $result = false;
         if ($this->redis->exists($this->getRunningSlbId($slbId))) {
             $result = $this->redis->get($this->getRunningSlbId($slbId));
+            Command::log('get slb id from redis:' . $result);
+        } else {
+            Command::log('slbId not exists in redis:' . $slbId);
         }
         return $result;
     }

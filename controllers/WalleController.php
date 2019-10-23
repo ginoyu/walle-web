@@ -89,10 +89,17 @@ class WalleController extends Controller
             throw new \Exception('task:' . $this->task->commit_id . " " . $this->task->title . ' already started');
         }
 
+        $this->conf = Project::getConf($this->task->project_id);
+
         $slbId = SlbFactory::getSlbId($this->conf);
 
+        if ($slbId) {
+            Command::log('get slb id:' . $slbId);
+        }
+
         if ($slbId && $taskStateManager->isRunningSlb($slbId)) {
-            $this->renderJson([], -1, yii::t('walle', '您使用的slb有服务正在上线，请等待！'));
+            Record::saveRecordCustomCommand(0, '您使用的slb有服务正在上线，请等待！', $taskId, 0, 0);
+            $this->renderJson([], 1, '您使用的slb有服务正在上线，请等待！');
             return;
         }
 
@@ -101,8 +108,11 @@ class WalleController extends Controller
 
         $taskStateManager->setRunningTask($taskId);
 
+        if ($slbId) {
+            $taskStateManager->setRunningSlbId($slbId);
+        }
+
         // 项目配置
-        $this->conf = Project::getConf($this->task->project_id);
         $this->walleTask = new WalleTask($this->conf);
         $this->walleFolder = new Folder($this->conf);
 
@@ -808,7 +818,6 @@ class WalleController extends Controller
             $slbConfig = SlbFactory::getSlbConfig($this->conf);
             $statusManager = new TaskStateManager();
             $user = User::findIdentity($this->task->user_id);
-            $statusManager->setRunningSlbId(SlbFactory::getSlbId($this->conf));
             $machineCount = count($hosts);
             $index = 0;
             $successHosts = [];
