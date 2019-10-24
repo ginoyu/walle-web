@@ -972,6 +972,7 @@ class WalleController extends Controller
             $cmd[] = $postRelease;
         }
 
+        $successHosts = array_reverse($successHosts);
         foreach ($successHosts as $host) {
             Command::log('dealSlbError begin rollback:' . $host);
             // 回滚之前设置weight为0
