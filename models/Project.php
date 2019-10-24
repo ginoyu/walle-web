@@ -111,7 +111,7 @@ class Project extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['user_id', 'repo_url', 'name', 'level', 'deploy_from', 'release_user', 'release_to', 'release_library', 'hosts', 'keep_version_num','slb_type','commit_id'], 'required'],
+            [['user_id', 'repo_url', 'name', 'level', 'deploy_from', 'release_user', 'release_to', 'release_library', 'hosts', 'keep_version_num','slb_type'], 'required'],
             [['user_id', 'level', 'status', 'post_release_delay', 'audit', 'ansible', 'keep_version_num','slb_status'], 'integer'],
             [['excludes', 'hosts', 'pre_deploy', 'post_deploy', 'pre_release', 'post_release','test_url','ding_token','commit_id'], 'string'],
             [['created_at', 'updated_at'], 'safe'],

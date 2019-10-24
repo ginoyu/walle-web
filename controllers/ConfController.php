@@ -158,6 +158,8 @@ class ConfController extends Controller
                 // 保存ansible需要的hosts文件
                 $this->_saveAnsibleHosts($project);
                 $this->redirect('@web/conf/');
+            } else {
+                Command::log("project save failed! id:$projectId");
             }
         }
 
